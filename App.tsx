@@ -165,23 +165,44 @@ export default function App() {
     if (filesToUpload.length === 0) return;
     setUploading(true);
     try {
-      const payloads = await Promise.all(filesToUpload.map(async (file) => {
+      let combinedHeaders: string[] = [];
+      let combinedData: LeadRow[] = [];
+      let combinedName = filesToUpload[0].name;
+
+      if (filesToUpload.length > 1) {
+        combinedName = `${filesToUpload[0].name} + ${filesToUpload.length - 1} files`;
+      }
+
+      for (const file of filesToUpload) {
         const text = await file.text();
         const { headers, data } = parseCSV(text);
-        return {
-          name: file.name,
-          headers,
-          data: data.slice(0, 1000),
-          statuses: {},
-        };
-      }));
 
-      const { data, error } = await supabase.from('datasets').insert(payloads).select();
+        if (combinedHeaders.length === 0) {
+          combinedHeaders = headers;
+        } else {
+          headers.forEach(h => {
+            if (!combinedHeaders.includes(h)) {
+              combinedHeaders.push(h);
+            }
+          });
+        }
+
+        combinedData.push(...data);
+      }
+
+      const payload = {
+        name: combinedName,
+        headers: combinedHeaders,
+        data: combinedData.slice(0, 5000),
+        statuses: {},
+      };
+
+      const { data, error } = await supabase.from('datasets').insert([payload]).select();
       if (error) throw new Error(error.message);
 
       await fetchDatasets();
       setFilesToUpload([]);
-      showFeedback("Dataset synced to cloud database", 'success');
+      showFeedback("Datasets merged and synced to cloud database", 'success');
       if (data && data.length > 0) {
         setSelectedDatasetId(data[0].id);
         setCurrentView('dataset');
