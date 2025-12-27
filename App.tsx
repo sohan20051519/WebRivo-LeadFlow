@@ -26,7 +26,8 @@ import {
   Plus,
   CheckSquare,
   Layers,
-  Zap
+  Zap,
+  Globe
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { createClient } from '@supabase/supabase-js';
@@ -45,8 +46,6 @@ const CALCULATOR_FEATURES: Record<string, { id: string, name: string, price: num
   whatsapp: { id: 'whatsapp', name: 'WhatsApp Link', price: 499 },
   maps: { id: 'maps', name: 'Google Maps', price: 499 },
   pages_5: { id: 'pages_5', name: '5-Page Site', price: 1499 },
-  services: { id: 'services', name: 'Services List', price: 999 },
-  contact: { id: 'contact', name: 'Contact Form', price: 999 },
   seo: { id: 'seo', name: 'SEO Core', price: 1499 },
   gbp: { id: 'gbp', name: 'GBP Optimization', price: 1499 },
   booking: { id: 'booking', name: 'Booking System', price: 2499 },
@@ -64,6 +63,13 @@ const CALCULATOR_ADDONS = [
   { id: 'lang', name: 'Multilingual', price: 1499 }
 ];
 
+const CALCULATOR_DOMAINS = [
+  { id: 'com', name: '.com Domain', price: 2500 },
+  { id: 'in', name: '.in Domain', price: 2000 },
+  { id: 'org', name: '.org Domain', price: 2000 },
+  { id: 'xyz', name: '.xyz Domain', price: 2000 }
+];
+
 const CALCULATOR_PLANS: Record<string, { name: string, price: number, included: string[] }> = {
   basic: {
     name: "Basic",
@@ -73,12 +79,12 @@ const CALCULATOR_PLANS: Record<string, { name: string, price: number, included: 
   business: {
     name: "Business",
     price: 7999,
-    included: ['pages_5', 'services', 'contact', 'seo', 'gbp', 'mobile', 'whatsapp', 'maps']
+    included: ['pages_5', 'seo', 'gbp', 'mobile', 'whatsapp', 'maps']
   },
   premium: {
     name: "Premium",
     price: 19999,
-    included: ['pages_5', 'booking', 'payment', 'admin', 'support', 'services', 'contact', 'seo', 'gbp', 'mobile', 'whatsapp', 'maps']
+    included: ['pages_5', 'booking', 'payment', 'admin', 'support', 'seo', 'gbp', 'mobile', 'whatsapp', 'maps']
   },
   custom_build: {
     name: "Custom",
@@ -330,6 +336,7 @@ export default function App() {
   const [calcPlanId, setCalcPlanId] = useState('basic');
   const [calcUpgrades, setCalcUpgrades] = useState<Set<string>>(new Set());
   const [calcAddons, setCalcAddons] = useState<Set<string>>(new Set());
+  const [calcDomains, setCalcDomains] = useState<Set<string>>(new Set());
   const [calcCustomItems, setCalcCustomItems] = useState<{ name: string, price: number }[]>([]);
   const [newCustomName, setNewCustomName] = useState('');
   const [newCustomPrice, setNewCustomPrice] = useState('');
@@ -345,6 +352,15 @@ export default function App() {
 
   const toggleAddon = (id: string) => {
     setCalcAddons(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleDomain = (id: string) => {
+    setCalcDomains(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -369,9 +385,10 @@ export default function App() {
     let t = CALCULATOR_PLANS[calcPlanId].price;
     calcUpgrades.forEach(id => { t += CALCULATOR_FEATURES[id]?.price || 0; });
     calcAddons.forEach(id => { t += CALCULATOR_ADDONS.find(a => a.id === id)?.price || 0; });
+    calcDomains.forEach(id => { t += CALCULATOR_DOMAINS.find(d => d.id === id)?.price || 0; });
     calcCustomItems.forEach(item => { t += item.price; });
     return t;
-  }, [calcPlanId, calcUpgrades, calcAddons, calcCustomItems]);
+  }, [calcPlanId, calcUpgrades, calcAddons, calcDomains, calcCustomItems]);
 
   // --- UI Helpers ---
   const globalStats: GlobalStats = useMemo(() => {
@@ -773,6 +790,30 @@ export default function App() {
                               </div>
                             </div>
                             <span className="text-[#4fd1a5] text-[10px] font-bold">+ ₹{feat.price}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-bold text-[#4fd1a5] flex items-center gap-1.5 uppercase tracking-widest opacity-80"><Globe className="w-3.5 h-3.5" /> Domains</h3>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                      {CALCULATOR_DOMAINS.map(domain => {
+                        const isSelected = calcDomains.has(domain.id);
+                        return (
+                          <div
+                            key={domain.id}
+                            onClick={() => toggleDomain(domain.id)}
+                            className={`p-2.5 rounded-lg border cursor-pointer transition-all flex flex-col justify-between min-h-[64px] ${isSelected ? 'border-[#4fd1a5] bg-[#1b2622]' : 'border-[#222] bg-[#151917] hover:border-[#444]'}`}
+                          >
+                            <div className="flex justify-between items-start gap-1">
+                              <span className={`text-[11px] font-semibold leading-tight ${isSelected ? 'text-[#4fd1a5]' : 'text-gray-400'}`}>{domain.name}</span>
+                              <div className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center ${isSelected ? 'bg-[#4fd1a5] border-[#4fd1a5]' : 'border-[#333]'}`}>
+                                {isSelected && <Check className="w-2.5 h-2.5 text-black font-bold" />}
+                              </div>
+                            </div>
+                            <span className="text-[#4fd1a5] text-[10px] font-bold">+ ₹{domain.price}</span>
                           </div>
                         );
                       })}
