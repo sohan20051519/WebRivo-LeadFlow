@@ -1,0 +1,5 @@
+{
+  "name": "LeadFlow AI",
+  "description": "An intelligent lead management dashboard that uses Gemini AI to score and analyze CSV-based lead datasets, featuring real-time insights and a modern bento-grid dashboard.",
+  "requestFramePermissions": []
+}
