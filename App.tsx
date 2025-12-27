@@ -202,7 +202,7 @@ export default function App() {
 
       await fetchDatasets();
       setFilesToUpload([]);
-      showFeedback("Dataset synced to cloud database", 'success');
+      showFeedback("Datasets merged and synced to cloud database", 'success');
       if (data && data.length > 0) {
         setSelectedDatasetId(data[0].id);
         setCurrentView('dataset');
