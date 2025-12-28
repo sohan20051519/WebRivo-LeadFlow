@@ -1,7 +1,0 @@
-{
-  "/dataset/[id]/page": "app/dataset/[id]/page.js",
-  "/dash/page": "app/dash/page.js",
-  "/calc/page": "app/calc/page.js",
-  "/accepted/page": "app/accepted/page.js",
-  "/waitlist/page": "app/waitlist/page.js"
-}

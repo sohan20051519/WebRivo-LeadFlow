@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 40, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/sohan/Downloads/lead%20update%201/WebRivo-LeadFlow/src/app/api/auth/route.ts"],"sourcesContent":["import { NextRequest, NextResponse } from 'next/server';\r\n\r\n// Passcode is stored server-side only - NOT exposed to frontend\r\nconst VALID_PASSCODE = '151920';\r\n\r\nexport async function POST(request: NextRequest) {\r\n    try {\r\n        const { passcode } = await request.json();\r\n\r\n        if (passcode === VALID_PASSCODE) {\r\n            return NextResponse.json({ success: true });\r\n        } else {\r\n            return NextResponse.json({ success: false, error: 'Invalid passcode' }, { status: 401 });\r\n        }\r\n    } catch (error) {\r\n        return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 });\r\n    }\r\n}\r\n"],"names":[],"mappings":";;;;AAAA;;AAEA,gEAAgE;AAChE,MAAM,iBAAiB;AAEhB,eAAe,KAAK,OAAoB;IAC3C,IAAI;QACA,MAAM,EAAE,QAAQ,EAAE,GAAG,MAAM,QAAQ,IAAI;QAEvC,IAAI,aAAa,gBAAgB;YAC7B,OAAO,uMAAY,CAAC,IAAI,CAAC;gBAAE,SAAS;YAAK;QAC7C,OAAO;YACH,OAAO,uMAAY,CAAC,IAAI,CAAC;gBAAE,SAAS;gBAAO,OAAO;YAAmB,GAAG;gBAAE,QAAQ;YAAI;QAC1F;IACJ,EAAE,OAAO,OAAO;QACZ,OAAO,uMAAY,CAAC,IAAI,CAAC;YAAE,SAAS;YAAO,OAAO;QAAkB,GAAG;YAAE,QAAQ;QAAI;IACzF;AACJ"}}]
-}
