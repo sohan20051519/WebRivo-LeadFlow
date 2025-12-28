@@ -2,7 +2,9 @@
 
 import { useLeadFlow } from '@/context/LeadFlowContext'; // Not used directly for calc state, but maybe for layout
 import { useState, useMemo } from 'react';
-import { Check, CheckSquare, Plus, Layers, Globe, Zap } from 'lucide-react';
+import { Check, CheckSquare, Plus, Layers, Globe, Zap, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const CALCULATOR_FEATURES: Record<string, { id: string, name: string, price: number }> = {
     mobile: { id: 'mobile', name: 'Mobile Design', price: 499 },
@@ -65,6 +67,11 @@ export default function CalculatorPage() {
     const [newCustomName, setNewCustomName] = useState('');
     const [newCustomPrice, setNewCustomPrice] = useState('');
 
+    // PDF Modal State
+    const [pdfModalOpen, setPdfModalOpen] = useState(false);
+    const [pdfBusinessName, setPdfBusinessName] = useState('');
+    const [pdfOwnerName, setPdfOwnerName] = useState('');
+
     const toggleUpgrade = (id: string) => {
         setCalcUpgrades(prev => {
             const next = new Set(prev);
@@ -114,8 +121,128 @@ export default function CalculatorPage() {
         return t;
     }, [calcPlanId, calcUpgrades, calcAddons, calcDomains, calcCustomItems]);
 
+    const generatePDF = () => {
+        try {
+            const doc = new jsPDF();
+
+            // Brand Header
+            doc.setFillColor(15, 32, 39); // Dark background
+            doc.rect(0, 0, 210, 42, 'F');
+
+            // Left Side: WebRivo + Contact Info
+            doc.setFontSize(24);
+            doc.setTextColor(79, 209, 165); // #4fd1a5
+            doc.text("WebRivo", 14, 15);
+
+            doc.setFontSize(8);
+            doc.setTextColor(200, 200, 200);
+            doc.text("Email: webrivo.official@gmail.com", 14, 22);
+            doc.text("Website: https://webrivo.vercel.app/", 14, 27);
+            doc.text("Contact: +91 80501 30969, +91 91132 53754, +91 63666 10809", 14, 32);
+
+            // Right Side: Quotation Title
+            doc.setFontSize(10);
+            doc.setTextColor(255, 255, 255);
+            doc.text("LeadFlow Quotation", 200, 22, { align: 'right' });
+
+            // Meta Info
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(10);
+            doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 55);
+            doc.text(`Valid for: 7 Days`, 14, 60);
+
+            // Client Info (Prepared For)
+            if (pdfBusinessName || pdfOwnerName) {
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "bold");
+                doc.text("Prepared For:", 130, 55);
+
+                doc.setFont("helvetica", "normal");
+                let yPos = 61;
+                if (pdfBusinessName) {
+                    doc.text(`Business Name: ${pdfBusinessName}`, 130, yPos);
+                    yPos += 5;
+                }
+                if (pdfOwnerName) {
+                    doc.text(`Owner Name: ${pdfOwnerName}`, 130, yPos);
+                }
+            }
+
+            // Plan Summary
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text(`Selected Plan: ${CALCULATOR_PLANS[calcPlanId].name.toUpperCase()}`, 14, 75);
+
+            const tableBody: any[] = [];
+
+            // Base Plan Row
+            tableBody.push([
+                { content: 'Base Plan Price', styles: { fontStyle: 'bold' } },
+                'Standard',
+                `Rs. ${CALCULATOR_PLANS[calcPlanId].price.toLocaleString()}`
+            ]);
+
+            // Upgrades
+            calcUpgrades.forEach(id => {
+                const f = CALCULATOR_FEATURES[id];
+                tableBody.push([f.name, "Upgrade", `Rs. ${f.price.toLocaleString()}`]);
+            });
+
+            // Domains
+            calcDomains.forEach(id => {
+                const d = CALCULATOR_DOMAINS.find(x => x.id === id);
+                if (d) tableBody.push([d.name, "Domain", `Rs. ${d.price.toLocaleString()}`]);
+            });
+
+            // Addons
+            calcAddons.forEach(id => {
+                const a = CALCULATOR_ADDONS.find(x => x.id === id);
+                if (a) tableBody.push([a.name, "Add-on", `Rs. ${a.price.toLocaleString()}`]);
+            });
+
+            // Custom
+            calcCustomItems.forEach(item => {
+                tableBody.push([item.name, "Custom", `Rs. ${item.price.toLocaleString()}`]);
+            });
+
+            // Total Row
+            tableBody.push([
+                { content: 'GRAND TOTAL', styles: { fontStyle: 'bold', fillColor: [240, 255, 250] } },
+                { content: '', styles: { fillColor: [240, 255, 250] } },
+                { content: `Rs. ${calcTotal.toLocaleString()}`, styles: { fontStyle: 'bold', textColor: [79, 209, 165], fillColor: [240, 255, 250] } }
+            ]);
+
+            autoTable(doc, {
+                startY: 85,
+                head: [['Description', 'Category', 'Price']],
+                body: tableBody,
+                theme: 'grid',
+                headStyles: { fillColor: [21, 25, 23], textColor: [79, 209, 165] },
+                styles: { fontSize: 10, cellPadding: 5 },
+                columnStyles: {
+                    0: { cellWidth: 'auto' },
+                    1: { cellWidth: 40 },
+                    2: { cellWidth: 40, halign: 'right' }
+                }
+            });
+
+            // Footer Note
+            const finalY = (doc as any).lastAutoTable.finalY + 15;
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text("Terms & Conditions: 50% advance payment required to start work. Remaining 50% upon completion.", 14, finalY);
+
+            const fileName = pdfBusinessName ? `${pdfBusinessName.replace(/[^a-z0-9]/gi, '_')}_Quotation.pdf` : "WebRivo_Quotation.pdf";
+            doc.save(fileName);
+            setPdfModalOpen(false);
+        } catch (error) {
+            console.error("PDF Download Error:", error);
+            alert("Failed to generate PDF. See console.");
+        }
+    };
+
     return (
-        <div className="h-full flex flex-col overflow-hidden animate-in fade-in duration-500 bg-[#0b0f0e]">
+        <div className="h-full flex flex-col overflow-hidden animate-in fade-in duration-500 bg-[#0b0f0e] relative">
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden p-4 gap-4">
                 {/* Left Panel - Full width on mobile, fixed width on desktop */}
                 <div className="w-full md:w-72 flex flex-col gap-4 md:border-r border-[#222] md:pr-4 pb-4 md:pb-0 border-b md:border-b-0">
@@ -255,8 +382,65 @@ export default function CalculatorPage() {
                     <span className="text-white font-bold text-sm">Quotation Total</span>
                     <span className="text-[10px] text-gray-400 font-medium">Estimated build cost including tax</span>
                 </div>
-                <div className="text-3xl md:text-4xl font-black text-[#4fd1a5] tracking-tighter">₹ {calcTotal.toLocaleString()}</div>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => setPdfModalOpen(true)}
+                        className="hidden md:flex items-center gap-2 bg-[#1a3a4a] hover:bg-[#254e60] text-[#4fd1a5] px-4 py-2 rounded-lg border border-[#4fd1a5]/30 transition-all text-xs font-bold uppercase tracking-wider shadow-lg shadow-[#4fd1a5]/10 active:scale-95"
+                    >
+                        <Download className="w-4 h-4" /> Download PDF
+                    </button>
+                    <div className="text-3xl md:text-4xl font-black text-[#4fd1a5] tracking-tighter">₹ {calcTotal.toLocaleString()}</div>
+                </div>
             </footer>
+
+            {/* PDF Details Modal */}
+            {pdfModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-[#151917] border border-[#333] rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+                        <h3 className="text-xl font-bold text-white mb-1">Client Details</h3>
+                        <p className="text-xs text-gray-400 mb-6">Enter details to personalize the quotation PDF.</p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Business / Project Name</label>
+                                <input
+                                    type="text"
+                                    value={pdfBusinessName}
+                                    onChange={(e) => setPdfBusinessName(e.target.value)}
+                                    placeholder="e.g. Acme Studio"
+                                    className="w-full bg-[#0b0f0e] border border-[#333] rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#4fd1a5] focus:ring-1 focus:ring-[#4fd1a5] transition-all text-sm"
+                                    autoFocus
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Owner Name (Optional)</label>
+                                <input
+                                    type="text"
+                                    value={pdfOwnerName}
+                                    onChange={(e) => setPdfOwnerName(e.target.value)}
+                                    placeholder="e.g. John Doe"
+                                    className="w-full bg-[#0b0f0e] border border-[#333] rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#4fd1a5] focus:ring-1 focus:ring-[#4fd1a5] transition-all text-sm"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 mt-8">
+                            <button
+                                onClick={() => setPdfModalOpen(false)}
+                                className="flex-1 px-4 py-3 bg-[#1a1a1a] hover:bg-[#222] text-gray-400 rounded-xl font-bold text-sm transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={generatePDF}
+                                className="flex-1 px-4 py-3 bg-[#4fd1a5] hover:bg-[#3db890] text-black rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Download className="w-4 h-4" /> Generate PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
