@@ -6,7 +6,7 @@ import { Check, CheckSquare, Plus, Layers, Globe, Zap } from 'lucide-react';
 
 const CALCULATOR_FEATURES: Record<string, { id: string, name: string, price: number }> = {
     mobile: { id: 'mobile', name: 'Mobile Design', price: 499 },
-    whatsapp: { id: 'whatsapp', name: 'WhatsApp Link', price: 499 },
+    whatsapp: { id: 'whatsapp', name: 'Default Website Link', price: 499 },
     maps: { id: 'maps', name: 'Google Maps', price: 499 },
     pages_5: { id: 'pages_5', name: '5-Page Site', price: 1499 },
     seo: { id: 'seo', name: 'SEO Core', price: 1499 },
@@ -20,7 +20,7 @@ const CALCULATOR_FEATURES: Record<string, { id: string, name: string, price: num
 };
 
 const CALCULATOR_ADDONS = [
-    { id: 'maint', name: 'Maintenance', price: 499 },
+    { id: 'maint', name: 'Maintenance (Per Month)', price: 499 },
     { id: 'rank', name: 'Rank Setup', price: 999 },
     { id: 'wa_auto', name: 'WA Automation', price: 499 },
     { id: 'lang', name: 'Multilingual', price: 1499 }
@@ -37,7 +37,7 @@ const CALCULATOR_PLANS: Record<string, { name: string, price: number, included: 
     basic: {
         name: "Basic",
         price: 2999,
-        included: ['page_1', 'mobile', 'delivery_3']
+        included: ['page_1', 'mobile', 'delivery_3', 'whatsapp']
     },
     business: {
         name: "Business",
@@ -116,8 +116,9 @@ export default function CalculatorPage() {
 
     return (
         <div className="h-full flex flex-col overflow-hidden animate-in fade-in duration-500 bg-[#0b0f0e]">
-            <div className="flex-1 flex overflow-hidden p-4 gap-4">
-                <div className="w-72 flex flex-col gap-4 border-r border-[#222] pr-4">
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden p-4 gap-4">
+                {/* Left Panel - Full width on mobile, fixed width on desktop */}
+                <div className="w-full md:w-72 flex flex-col gap-4 md:border-r border-[#222] md:pr-4 pb-4 md:pb-0 border-b md:border-b-0">
                     <div className="bg-[#151917] p-3 rounded-xl border border-[#333]">
                         <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Lead Package</label>
                         <select
@@ -137,7 +138,7 @@ export default function CalculatorPage() {
 
                     <div className="flex-1 flex flex-col min-h-0 gap-3">
                         <h3 className="text-xs font-bold text-[#4fd1a5] flex items-center gap-1.5 uppercase tracking-wider"><CheckSquare className="w-3.5 h-3.5" /> Included</h3>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 pr-1">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 pr-1 max-h-32 md:max-h-none">
                             {CALCULATOR_PLANS[calcPlanId].included.length === 0 ? (
                                 <p className="text-gray-600 text-[10px] italic">No base features.</p>
                             ) : (
@@ -174,7 +175,7 @@ export default function CalculatorPage() {
                 <div className="flex-1 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
                     <div className="space-y-3">
                         <h3 className="text-xs font-bold text-[#4fd1a5] flex items-center gap-1.5 uppercase tracking-widest opacity-80"><Layers className="w-3.5 h-3.5" /> Core Upgrades</h3>
-                        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                             {Object.keys(CALCULATOR_FEATURES).map(fid => {
                                 const feat = CALCULATOR_FEATURES[fid];
                                 if (CALCULATOR_PLANS[calcPlanId].included.includes(fid)) return null;
@@ -200,8 +201,8 @@ export default function CalculatorPage() {
                     </div>
 
                     <div className="space-y-3">
-                        <h3 className="text-xs font-bold text-[#4fd1a5] flex items-center gap-1.5 uppercase tracking-widest opacity-80"><Globe className="w-3.5 h-3.5" /> Domains</h3>
-                        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                        <h3 className="text-xs font-bold text-[#4fd1a5] flex items-center gap-1.5 uppercase tracking-widest opacity-80"><Globe className="w-3.5 h-3.5" /> Domains (Per Year/Renewal)</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                             {CALCULATOR_DOMAINS.map(domain => {
                                 const isSelected = calcDomains.has(domain.id);
                                 return (
@@ -225,7 +226,7 @@ export default function CalculatorPage() {
 
                     <div className="space-y-3">
                         <h3 className="text-xs font-bold text-[#4fd1a5] flex items-center gap-1.5 uppercase tracking-widest opacity-80"><Zap className="w-3.5 h-3.5" /> Add-ons</h3>
-                        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                             {CALCULATOR_ADDONS.map(addon => {
                                 const isSelected = calcAddons.has(addon.id);
                                 return (
@@ -249,12 +250,12 @@ export default function CalculatorPage() {
                 </div>
             </div>
 
-            <footer className="h-16 bg-gradient-to-r from-[#0f2027] via-[#1a3a4a] to-[#2c5364] flex justify-between items-center px-8 border-t border-[#333]">
-                <div className="flex flex-col">
+            <footer className="h-auto md:h-16 bg-gradient-to-r from-[#0f2027] via-[#1a3a4a] to-[#2c5364] flex flex-col sm:flex-row justify-between items-center px-4 md:px-8 py-3 md:py-0 border-t border-[#333] gap-2 sm:gap-0">
+                <div className="flex flex-col text-center sm:text-left">
                     <span className="text-white font-bold text-sm">Quotation Total</span>
                     <span className="text-[10px] text-gray-400 font-medium">Estimated build cost including tax</span>
                 </div>
-                <div className="text-4xl font-black text-[#4fd1a5] tracking-tighter">₹ {calcTotal.toLocaleString()}</div>
+                <div className="text-3xl md:text-4xl font-black text-[#4fd1a5] tracking-tighter">₹ {calcTotal.toLocaleString()}</div>
             </footer>
         </div>
     );

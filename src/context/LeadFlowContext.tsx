@@ -15,6 +15,10 @@ interface LeadFlowContextType {
     loading: boolean;
     refreshDatasets: () => Promise<void>;
 
+    // Global Clients State (for Dashboard)
+    clients: Client[];
+    refreshClients: () => Promise<void>;
+
     // Upload
     filesToUpload: File[];
     addFilesToUpload: (files: File[]) => void;
@@ -48,6 +52,7 @@ const LeadFlowContext = createContext<LeadFlowContextType | undefined>(undefined
 
 export function LeadFlowProvider({ children }: { children: ReactNode }) {
     const [datasets, setDatasets] = useState<Dataset[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -90,8 +95,19 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const fetchAllClients = async () => {
+        try {
+            const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
+            if (error) throw error;
+            if (data) setClients(data as Client[]);
+        } catch (e: any) {
+            console.error("Error fetching clients:", e.message);
+        }
+    };
+
     useEffect(() => {
         fetchDatasets();
+        fetchAllClients();
     }, []);
 
     const parseCSV = (text: string): { headers: string[], data: LeadRow[] } => {
@@ -294,6 +310,7 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
             const { data, error } = await supabase.from('clients').insert([clientData]).select().single();
             if (error) throw error;
             showFeedback("Client profile created successfully", 'success');
+            setClients(prev => [data as Client, ...prev]);
             return data.id;
         } catch (e: any) {
             console.error("Create client failed", e.message);
@@ -306,6 +323,7 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         try {
             const { error } = await supabase.from('clients').update(updates).eq('id', id);
             if (error) throw error;
+            setClients(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
             showFeedback("Client updated", 'success');
         } catch (e: any) {
             console.error("Update client failed", e.message);
@@ -317,6 +335,7 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         try {
             const { error } = await supabase.from('clients').delete().eq('id', id);
             if (error) throw error;
+            setClients(prev => prev.filter(c => c.id !== id));
             showFeedback("Client removed successfully", 'success');
             return true;
         } catch (e: any) {
@@ -333,6 +352,10 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
                 visibleDatasets: datasets.filter(d => !d.name.startsWith('__preserved__')),
                 loading,
                 refreshDatasets: fetchDatasets,
+
+                clients,
+                refreshClients: fetchAllClients,
+
                 filesToUpload,
                 addFilesToUpload: (files) => setFilesToUpload(prev => [...prev, ...files]),
                 removeFileFromUpload: (index) => setFilesToUpload(prev => prev.filter((_, i) => i !== index)),

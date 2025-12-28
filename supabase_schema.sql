@@ -24,6 +24,11 @@ create table public.clients (
   domains text[] default '{}',
   custom_items jsonb default '[]', -- Store array of {name, price}
   
+  -- Payment Tracking
+  payment_status text default 'unpaid', -- 'unpaid', 'partial', 'paid'
+  amount_paid numeric default 0,
+  total_deal_value numeric default 0,
+
   -- Technical Links
   github_repo text,
   live_url text,

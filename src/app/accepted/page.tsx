@@ -53,8 +53,8 @@ function ManageClientButton({ dsId, rowIdx, rowData }: { dsId: string, rowIdx: n
     };
 
     return (
-        <button onClick={handleClick} disabled={loading} className="p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all ml-1" title="Manage Client Profile">
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <User className="w-5 h-5" />}
+        <button onClick={handleClick} disabled={loading} className="p-1 md:p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all" title="Manage Client Profile">
+            {loading ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" /> : <User className="w-4 h-4 md:w-5 md:h-5" />}
         </button>
     );
 }
@@ -115,13 +115,13 @@ export default function AcceptedPage() {
                 <table className="w-full text-left border-collapse min-w-[300px] md:min-w-[800px]">
                     <thead className="sticky top-0 z-20 bg-slate-50 shadow-sm">
                         <tr>
-                            <th className="sticky left-0 bg-slate-50 px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-slate-100 w-16">
+                            <th className="sticky left-0 bg-slate-50 px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-slate-100 w-16">
                                 {/* Actions */}
                             </th>
                             {headers.map((h, i) => (
-                                <th key={i} className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[150px]">{h}</th>
+                                <th key={i} className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[120px] md:min-w-[150px]">{h}</th>
                             ))}
-                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">Source Dataset</th>
+                            <th className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">Source Dataset</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -130,7 +130,7 @@ export default function AcceptedPage() {
                                 // flatIdx is just loop index, we use item.idx for row index
                                 return (
                                     <tr key={`${item.dsId}-${item.idx}`} className="group hover:bg-slate-50 transition-colors bg-emerald-50/20">
-                                        <td className="sticky left-0 bg-white group-hover:bg-slate-50 px-2 py-4 border-r border-slate-100 z-10 box-border text-center">
+                                        <td className="sticky left-0 bg-white group-hover:bg-slate-50 px-2 py-3 md:py-4 border-r border-slate-100 z-10 box-border text-center">
                                             <ManageClientButton dsId={item.dsId} rowIdx={item.idx} rowData={item.row} />
                                         </td>
                                         {headers.map((h, i) => {
@@ -139,12 +139,12 @@ export default function AcceptedPage() {
                                             const isBusinessName = h === 'Business Name' || h === 'Company' || h === 'company' || h === 'Organization';
                                             const isEditing = editingCell?.dsId === item.dsId && editingCell?.rowIndex === item.idx && editingCell?.column === h;
                                             return (
-                                                <td key={i} className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                                                <td key={i} className="px-4 py-3 md:px-6 md:py-4 text-sm text-slate-600 whitespace-nowrap">
                                                     {isEditing ? (
                                                         <input autoFocus className="w-full bg-white border border-indigo-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-indigo-500" value={editingCell.value} onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })} onBlur={handleCellSave} onKeyDown={(e) => e.key === 'Enter' && handleCellSave()} />
                                                     ) : (
                                                         <div className="flex items-center gap-2 group/cell">
-                                                            <span onClick={() => isBusinessName && copyToClipboard(cellValue)} className={`truncate max-w-[200px] block ${isBusinessName ? 'cursor-copy hover:text-indigo-600 hover:underline transition-colors' : ''}`}>{cellValue || '-'}</span>
+                                                            <span onClick={() => isBusinessName && copyToClipboard(cellValue)} className={`truncate max-w-[150px] md:max-w-[200px] block ${isBusinessName ? 'cursor-copy hover:text-indigo-600 hover:underline transition-colors' : ''}`}>{cellValue || '-'}</span>
                                                             {isBusinessName && <button onClick={() => copyToClipboard(cellValue)} className="opacity-0 group-hover/cell:opacity-100 p-1 text-slate-400 hover:text-indigo-500 transition-all">{copiedText === cellValue ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}</button>}
                                                             {isEditable && <button onClick={() => setEditingCell({ dsId: item.dsId, rowIndex: item.idx, column: h, value: cellValue })} className="opacity-0 group-hover/cell:opacity-100 p-1 text-slate-400 hover:text-indigo-500 transition-all"><Edit2 className="w-3 h-3" /></button>}
                                                         </div>
@@ -152,7 +152,7 @@ export default function AcceptedPage() {
                                                 </td>
                                             );
                                         })}
-                                        <td className="px-6 py-4 text-xs font-bold text-indigo-500 whitespace-nowrap italic">{item.dsName}</td>
+                                        <td className="px-4 py-3 md:px-6 md:py-4 text-xs font-bold text-indigo-500 whitespace-nowrap italic">{item.dsName}</td>
                                     </tr>
                                 );
                             })

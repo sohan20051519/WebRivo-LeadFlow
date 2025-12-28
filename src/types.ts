@@ -55,6 +55,11 @@ export interface Client {
     design_link?: string;
 
     internal_notes?: string;
+
+    // Payment Tracking
+    payment_status: 'unpaid' | 'partial' | 'paid';
+    amount_paid: number;
+    total_deal_value: number; // Manually set or calculated default
 }
 
 export type ClientUpdatePayload = Partial<Omit<Client, 'id' | 'created_at'>>;
