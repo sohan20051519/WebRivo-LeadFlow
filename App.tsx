@@ -74,17 +74,17 @@ const CALCULATOR_PLANS: Record<string, { name: string, price: number, included: 
   basic: {
     name: "Basic",
     price: 2999,
-    included: ['page_1', 'mobile', 'whatsapp', 'maps', 'delivery_3']
+    included: ['page_1', 'mobile', 'delivery_3']
   },
   business: {
     name: "Business",
     price: 7999,
-    included: ['pages_5', 'seo', 'gbp', 'mobile', 'whatsapp', 'maps']
+    included: ['pages_5', 'seo', 'mobile', 'whatsapp']
   },
   premium: {
     name: "Premium",
     price: 19999,
-    included: ['pages_5', 'booking', 'payment', 'admin', 'support', 'seo', 'gbp', 'mobile', 'whatsapp', 'maps']
+    included: ['pages_5', 'booking', 'payment', 'admin', 'seo', 'mobile', 'whatsapp', 'maps']
   },
   custom_build: {
     name: "Custom",
