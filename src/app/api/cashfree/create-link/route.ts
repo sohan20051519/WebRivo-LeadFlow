@@ -38,10 +38,6 @@ export async function POST(request: Request) {
         // Use string "SANDBOX" or "PRODUCTION" directly to avoid undefined enum issues
         const env = process.env.CASHFREE_ENV === 'production' ? 'PRODUCTION' : 'SANDBOX';
 
-        console.log("CF Debug: AppID:", appId ? "Set" : "Missing");
-        console.log("CF Debug: Secret:", secretKey ? "Set" : "Missing");
-        console.log("CF Debug: Env:", env);
-
         // Force set static config
         // @ts-ignore
         Cashfree.XClientId = appId;
@@ -61,8 +57,6 @@ export async function POST(request: Request) {
         cf.XClientSecret = secretKey;
         // @ts-ignore
         cf.XEnvironment = env;
-
-        console.log("CF Debug: Configured. Calling PGCreateLink...");
 
         // @ts-ignore
         const response = await cf.PGCreateLink(apiVersion, requestData);
