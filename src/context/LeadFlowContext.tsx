@@ -137,9 +137,45 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
                 combinedName = `${filesToUpload[0].name} + ${filesToUpload.length - 1} files`;
             }
 
+            // Build index of existing data for duplicate detection
+            const existingPhones = new Set<string>();
+            const existingNames = new Set<string>();
+
+            datasets.forEach(ds => {
+                ds.data.forEach(row => {
+                    const phone = row['Phone Number'] || row['Phone'] || row['mobile'] || row['phone'];
+                    if (phone) existingPhones.add(String(phone).trim().toLowerCase());
+
+                    const name = row['Business Name'] || row['Company'] || row['Organization'] || row['company'];
+                    if (name) existingNames.add(String(name).trim().toLowerCase());
+                });
+            });
+
             for (const file of filesToUpload) {
                 const text = await file.text();
                 const { headers, data } = parseCSV(text);
+
+                // Check for duplicates in the new data
+                data.forEach(row => {
+                    // Check Phone
+                    const phoneKey = Object.keys(row).find(k => ['Phone Number', 'Phone', 'mobile', 'phone'].includes(k));
+                    if (phoneKey) {
+                        const val = String(row[phoneKey]).trim();
+                        // Check if it exists in DB (ignore if it already has the warning from a previous run, though unlikely on new upload)
+                        if (val && existingPhones.has(val.toLowerCase().replace(' ⚠️', ''))) {
+                            row[phoneKey] = val + " ⚠️";
+                        }
+                    }
+
+                    // Check Name
+                    const nameKey = Object.keys(row).find(k => ['Business Name', 'Company', 'Organization', 'company'].includes(k));
+                    if (nameKey) {
+                        const val = String(row[nameKey]).trim();
+                        if (val && existingNames.has(val.toLowerCase().replace(' ⚠️', ''))) {
+                            row[nameKey] = val + " ⚠️";
+                        }
+                    }
+                });
 
                 if (combinedHeaders.length === 0) {
                     combinedHeaders = headers;
