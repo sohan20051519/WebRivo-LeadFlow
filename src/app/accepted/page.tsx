@@ -59,12 +59,35 @@ function ManageClientButton({ dsId, rowIdx, rowData }: { dsId: string, rowIdx: n
     );
 }
 
+function PaymentStatusCell({ dsId, rowIdx }: { dsId: string, rowIdx: number }) {
+    const { clients } = useLeadFlow();
+    const client = clients.find(c => c.source_dataset_id === dsId && c.source_row_index === rowIdx);
 
-// ... existing ManageClientButton ...
+    if (!client) return <span className="text-slate-300 text-[10px] italic">-</span>;
+
+    // Calculate outstanding
+    const outstanding = (client.total_deal_value || 0) - (client.amount_paid || 0);
+
+    return (
+        <div className="flex flex-col items-center gap-1">
+            <span className={`text-[10px] font-bold uppercase tracking-wider rounded px-2.5 py-0.5 inline-block text-center ${client.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-600' :
+                    client.payment_status === 'partial' ? 'bg-amber-100 text-amber-600' :
+                        'bg-slate-100 text-slate-500'
+                }`}>
+                {client.payment_status === 'paid' ? 'Paid' :
+                    client.payment_status === 'partial' ? 'Partial' : 'Unpaid'}
+            </span>
+            {client.payment_status !== 'paid' && outstanding > 0 && (
+                <span className="text-[9px] font-bold text-rose-500">
+                    Due: ₹{outstanding}
+                </span>
+            )}
+        </div>
+    );
+}
 
 function ClientStatusCell({ dsId, rowIdx }: { dsId: string, rowIdx: number }) {
     const { clients } = useLeadFlow();
-    // Find client in the global context state
     const client = clients.find(c => c.source_dataset_id === dsId && c.source_row_index === rowIdx);
 
     if (!client) return <span className="text-slate-300 text-[10px] italic">No Client Profile</span>;
@@ -95,7 +118,7 @@ function ClientStatusCell({ dsId, rowIdx }: { dsId: string, rowIdx: number }) {
 }
 
 export default function AcceptedPage() {
-    const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm, clients } = useLeadFlow(); // added clients
+    const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm, clients } = useLeadFlow();
     const [editingCell, setEditingCell] = useState<{ dsId: string, rowIndex: number, column: string, value: string } | null>(null);
     const [copiedText, setCopiedText] = useState<string | null>(null);
 
@@ -153,6 +176,9 @@ export default function AcceptedPage() {
                             <th className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[120px]">
                                 Client Status
                             </th>
+                            <th className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[120px]">
+                                Payment
+                            </th>
                             {headers.map((h, i) => (
                                 <th key={i} className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[120px] md:min-w-[150px]">{h}</th>
                             ))}
@@ -170,6 +196,9 @@ export default function AcceptedPage() {
                                         </td>
                                         <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-center">
                                             <ClientStatusCell dsId={item.dsId} rowIdx={item.idx} />
+                                        </td>
+                                        <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-center">
+                                            <PaymentStatusCell dsId={item.dsId} rowIdx={item.idx} />
                                         </td>
                                         {headers.map((h, i) => {
                                             const cellValue = item.row[h] || '';
@@ -195,7 +224,7 @@ export default function AcceptedPage() {
                                 );
                             })
                         ) : (
-                            <tr><td colSpan={headers.length + 3} className="py-20 text-center text-slate-400"><div className="flex flex-col items-center gap-2"><Filter className="w-8 h-8 opacity-20" /><p className="text-sm font-medium">No accepted leads found.</p></div></td></tr>
+                            <tr><td colSpan={headers.length + 4} className="py-20 text-center text-slate-400"><div className="flex flex-col items-center gap-2"><Filter className="w-8 h-8 opacity-20" /><p className="text-sm font-medium">No accepted leads found.</p></div></td></tr>
                         )}
                     </tbody>
                 </table>
@@ -203,4 +232,3 @@ export default function AcceptedPage() {
         </div>
     );
 }
-

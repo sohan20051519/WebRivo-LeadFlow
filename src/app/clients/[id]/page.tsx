@@ -97,6 +97,9 @@ export default function ClientPage() {
                     payment_status: 'paid',
                     amount_paid: total
                 });
+                // Update local state immediately so UI reflects it
+                setClient(prev => prev ? ({ ...prev, payment_status: 'paid', amount_paid: total }) : null);
+
                 showFeedback("Payment confirmed! Status updated to PAID.", 'success');
                 // Clean URL
                 router.replace(`/clients/${client.id}`);
