@@ -1,3 +1,5 @@
+"use client";
+
 import { useLeadFlow } from '@/context/LeadFlowContext';
 import { LeadStatus } from '@/types';
 import { useState, useMemo } from 'react';
