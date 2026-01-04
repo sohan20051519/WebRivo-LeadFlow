@@ -36,7 +36,8 @@ export async function POST(request: Request) {
 
 
         // Use string "SANDBOX" or "PRODUCTION" directly to avoid undefined enum issues
-        const env = process.env.CASHFREE_ENV === 'production' ? 'PRODUCTION' : 'SANDBOX';
+        // Explicitly set to PRODUCTION as per user confirmation
+        const env = 'PRODUCTION';
 
         // Force set static config
         // @ts-ignore
