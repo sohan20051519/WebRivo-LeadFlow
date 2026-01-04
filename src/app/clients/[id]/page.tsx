@@ -3,8 +3,8 @@
 import { useLeadFlow } from '@/context/LeadFlowContext';
 import { Client, LeadStatus } from '@/types';
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Upload, Save, CheckCircle, ExternalLink, Github, Database, Globe, Briefcase, DollarSign, Layout, Server, Shield, Layers, Plus, Trash2, Check, XCircle, ArrowLeft, CreditCard } from 'lucide-react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { Upload, Save, CheckCircle, ExternalLink, Github, Database, Globe, Briefcase, DollarSign, Layout, Server, Shield, Layers, Plus, Trash2, Check, XCircle, ArrowLeft, CreditCard, Send, Loader2, Bell, FileText, Smartphone, MessageCircle, MapPin, Search, Calendar, Monitor, LifeBuoy } from 'lucide-react';
 
 const PACKAGES = [
     { id: 'basic', name: 'Basic', price: 2999 },
@@ -58,15 +58,17 @@ const PLAN_INCLUDES: Record<string, string[]> = {
 export default function ClientPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { getClient, updateClient, deleteClient, updateLeadStatus, showFeedback } = useLeadFlow();
     const [client, setClient] = useState<Client | null>(null);
     const [loading, setLoading] = useState(true);
     const [autoSaving, setAutoSaving] = useState(false);
     const isInitialLoad = useRef(true);
 
-    // New item state
     const [newItemName, setNewItemName] = useState('');
     const [newItemPrice, setNewItemPrice] = useState('');
+    const [linkLoading, setLinkLoading] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
 
     useEffect(() => {
         const load = async () => {
@@ -84,20 +86,36 @@ export default function ClientPage() {
         load();
     }, [params.id]);
 
-    // Auto-Calculate Price
+    // Check for Payment Return Status
+    useEffect(() => {
+        if (!client || !searchParams.get('status')) return;
+
+        if (searchParams.get('status') === 'paid' && client.payment_status !== 'paid') {
+            const updatePayment = async () => {
+                const total = client.total_deal_value || 0;
+                await updateClient(client.id, {
+                    payment_status: 'paid',
+                    amount_paid: total
+                });
+                showFeedback("Payment confirmed! Status updated to PAID.", 'success');
+                // Clean URL
+                router.replace(`/clients/${client.id}`);
+            };
+            updatePayment();
+        }
+    }, [searchParams, client]);
+
+    // Auto-Calculate Price based on packages/features
     useEffect(() => {
         if (!client) return;
 
-        // 1. Base Package Price
         const pkg = PACKAGES.find(p => p.id === client.selected_package);
         let total = pkg ? pkg.price : 0;
 
-        // 2. Core Upgrades
         const includedFeatures = PLAN_INCLUDES[client.selected_package] || [];
 
         if (client.core_upgrades) {
             client.core_upgrades.forEach(id => {
-                // Only add price if NOT included in the base plan
                 if (!includedFeatures.includes(id)) {
                     const feat = FEATURES.find(f => f.id === id);
                     if (feat) total += feat.price;
@@ -105,7 +123,6 @@ export default function ClientPage() {
             });
         }
 
-        // 3. Add-ons
         if (client.add_ons) {
             client.add_ons.forEach(id => {
                 const addon = ADDONS.find(a => a.id === id);
@@ -113,7 +130,6 @@ export default function ClientPage() {
             });
         }
 
-        // 4. Domains (Check against TLDs)
         if (client.domains) {
             client.domains.forEach(domainStr => {
                 const lowerDomain = domainStr.toLowerCase();
@@ -122,14 +138,12 @@ export default function ClientPage() {
             });
         }
 
-        // 5. Custom Items
         if (client.custom_items) {
             client.custom_items.forEach(item => {
                 total += item.price || 0;
             });
         }
 
-        // Only update if changed to avoid loop
         if (total !== client.package_price || total !== client.total_deal_value) {
             setClient(prev => prev ? ({ ...prev, package_price: total, total_deal_value: total }) : null);
         }
@@ -142,7 +156,7 @@ export default function ClientPage() {
         client?.domains
     ]);
 
-    // Auto-save with debounce
+    // Auto-save
     useEffect(() => {
         if (!client || isInitialLoad.current) {
             isInitialLoad.current = false;
@@ -152,12 +166,13 @@ export default function ClientPage() {
         const timeoutId = setTimeout(async () => {
             setAutoSaving(true);
             try {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { id, created_at, ...updates } = client;
                 await updateClient(client.id, updates);
             } finally {
                 setAutoSaving(false);
             }
-        }, 1000); // 1 second debounce
+        }, 1000);
 
         return () => clearTimeout(timeoutId);
     }, [client]);
@@ -176,10 +191,91 @@ export default function ClientPage() {
         handleChange(field, updated);
     };
 
-    const handleDomainToggle = (domain: string) => {
+    const handleGenerateLinkOpen = () => {
         if (!client) return;
-        handleArrayToggle('domains', domain);
-    }
+        const outstanding = (client.total_deal_value || 0) - (client.amount_paid || 0);
+        if (outstanding <= 0) {
+            showFeedback("Client has no outstanding payment.", 'info');
+            return;
+        }
+        setShowPaymentModal(true);
+    };
+
+    const confirmGenerateLink = async () => {
+        if (!client) return;
+        const outstanding = (client.total_deal_value || 0) - (client.amount_paid || 0);
+
+        setLinkLoading(true);
+        try {
+            const res = await fetch('/api/cashfree/create-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: outstanding,
+                    customer_phone: client.phone,
+                    customer_name: client.contact_name || client.business_name,
+                    link_purpose: `Payment for ${client.selected_package} package`,
+                    client_id: client.id,
+                    customer_email: client.email
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to generate link');
+
+            showFeedback(`Payment link created & SMS sent! Link ID: ${data.link_id}`, 'success');
+            setShowPaymentModal(false);
+
+        } catch (error: any) {
+            showFeedback(error.message, 'error');
+        } finally {
+            setLinkLoading(false);
+        }
+    };
+
+    const handleSendReminder = async () => {
+        if (!client || !client.phone) return;
+
+        const outstanding = (client.total_deal_value || 0) - (client.amount_paid || 0);
+        if (outstanding <= 0) {
+            showFeedback("Client has no outstanding payment.", 'info');
+            return;
+        }
+
+        setLinkLoading(true);
+        try {
+            // Generate Link first
+            const res = await fetch('/api/cashfree/create-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: outstanding,
+                    customer_phone: client.phone,
+                    customer_name: client.contact_name || client.business_name,
+                    link_purpose: `Payment for ${client.selected_package} package`,
+                    client_id: client.id,
+                    customer_email: client.email
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to generate link for reminder');
+
+            // Construct WhatsApp Message with Link
+            const linkUrl = data.link_url; // Captured from API response
+            const text = `Hi ${client.contact_name || 'Valued Client'},\n\nThis is a gentle reminder regarding the outstanding payment of ₹${outstanding} for your ${client.selected_package} package with WebRivo.\n\nPlease clear the dues at your earliest convenience to avoid any service interruption.\n\nType: Secure Payment Link\nPay Here: ${linkUrl}\n\nBest,\nWebRivo Team`;
+
+            const url = `https://wa.me/${client.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`;
+            window.open(url, '_blank');
+
+            showFeedback('Reminder link generated & WhatsApp opened!', 'success');
+
+        } catch (error: any) {
+            showFeedback(error.message, 'error');
+        } finally {
+            setLinkLoading(false);
+        }
+    };
 
     const addCustomItem = () => {
         if (!client || !newItemName) return;
@@ -192,7 +288,7 @@ export default function ClientPage() {
 
     const removeCustomItem = (idx: number) => {
         if (!client) return;
-        const newItems = [...client.custom_items];
+        const newItems = [...(client.custom_items || [])];
         newItems.splice(idx, 1);
         handleChange('custom_items', newItems);
     }
@@ -201,7 +297,60 @@ export default function ClientPage() {
     if (!client) return null;
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 overflow-hidden">
+        <div className="h-full flex flex-col bg-slate-50 overflow-hidden relative">
+
+            {/* Payment Confirmation Modal */}
+            {showPaymentModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="bg-slate-50 border-b border-slate-100 p-4">
+                            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                <DollarSign className="w-5 h-5 text-emerald-500" /> Confirm Payment Link
+                            </h3>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="space-y-1">
+                                    <p className="text-slate-500 text-xs uppercase font-bold">Client</p>
+                                    <p className="font-medium text-slate-800">{client.business_name}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-slate-500 text-xs uppercase font-bold">Phone</p>
+                                    <p className="font-medium text-slate-800">{client.phone}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-slate-500 text-xs uppercase font-bold">Total Deal</p>
+                                    <p className="font-medium text-slate-800">₹{client.total_deal_value}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-slate-500 text-xs uppercase font-bold">Paid So Far</p>
+                                    <p className="font-medium text-emerald-600">₹{client.amount_paid || 0}</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-sm font-bold text-indigo-900">Link Amount (Outstanding)</span>
+                                    <span className="text-xl font-bold text-indigo-600">₹{(client.total_deal_value || 0) - (client.amount_paid || 0)}</span>
+                                </div>
+                                <p className="text-xs text-indigo-500/80">This amount will be requested via Cashfree.</p>
+                            </div>
+
+                            <p className="text-xs text-slate-400 text-center italic">
+                                Clicking "Send" will trigger an SMS to the client with the payment link.
+                            </p>
+                        </div>
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+                            <button onClick={() => setShowPaymentModal(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-white hover:border-slate-300 transition-all">Cancel</button>
+                            <button onClick={confirmGenerateLink} disabled={linkLoading} className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-md shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
+                                {linkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                {linkLoading ? 'Sending...' : 'Confirm & Send'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="bg-white border-b border-slate-200 px-4 py-3 md:px-8 md:py-4 flex flex-col md:flex-row justify-between items-start md:items-center z-10 shadow-sm relative gap-4 md:gap-0">
                 <div className="flex items-center w-full md:w-auto">
@@ -232,11 +381,9 @@ export default function ClientPage() {
                 <div className="flex items-center gap-3 w-full md:w-auto justify-end md:justify-start pl-12 md:pl-0">
                     <button onClick={async () => {
                         if (confirm(`Are you sure you want to delete ${client.business_name}? This will remove the profile and reset lead status to 'Waitlist'.`)) {
-                            // Reset status in dataset if linked
                             if (client.source_dataset_id && client.source_row_index !== undefined) {
                                 await updateLeadStatus(client.source_dataset_id, client.source_row_index, LeadStatus.WAIT);
                             }
-
                             const success = await deleteClient(client.id);
                             if (success) router.push('/accepted');
                         }
@@ -258,314 +405,265 @@ export default function ClientPage() {
             <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-6">
                 <div className="grid grid-cols-12 gap-4 md:gap-6 max-w-7xl mx-auto">
 
-                    {/* Left Column: Plan & Financials */}
+                    {/* Left Column */}
                     <div className="col-span-12 lg:col-span-4 space-y-6">
-                        {/* Package Card */}
+                        {/* Financials & Payment (Merged Card) */}
                         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <DollarSign className="w-4 h-4" /> Package & Pricing
+                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                                <DollarSign className="w-5 h-5 text-emerald-500" /> Financials & Payment
                             </h3>
-                            <div className="space-y-4">
+
+                            <div className="space-y-5">
+                                {/* Package Selection */}
                                 <div>
-                                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Selected Package</label>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Selected Package</label>
                                     <select
                                         value={client.selected_package}
-                                        onChange={(e) => {
-                                            handleChange('selected_package', e.target.value);
-                                            // Price update handled by useEffect
-                                        }}
+                                        onChange={(e) => handleChange('selected_package', e.target.value)}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm text-slate-700 outline-none focus:border-indigo-500 transition-colors"
                                     >
                                         {PACKAGES.map(p => <option key={p.id} value={p.id}>{p.name} - ₹{p.price}</option>)}
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-500 mb-1.5 flex justify-between">
-                                        Agreed Price (₹)
-                                        <span className="text-[10px] text-indigo-500 font-bold bg-indigo-50 px-2 rounded-full">Auto-Calculated</span>
-                                    </label>
+
+                                {/* Financial Summary */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                        <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider mb-1">Total Deal</p>
+                                        <p className="text-lg font-bold text-slate-800">₹{client.total_deal_value || 0}</p>
+                                    </div>
+                                    <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+                                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-1">Paid</p>
+                                        <p className="text-lg font-bold text-emerald-600">₹{client.amount_paid || 0}</p>
+                                    </div>
+                                </div>
+
+                                {/* Outstanding */}
+                                <div className="flex justify-between items-center p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                                    <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">Outstanding</span>
+                                    <span className="text-xl font-bold text-indigo-700">₹{(client.total_deal_value || 0) - (client.amount_paid || 0)}</span>
+                                </div>
+
+                                {/* Payment Status Badge */}
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-700">Current Status</span>
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md ${client.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-600' :
+                                        client.payment_status === 'partial' ? 'bg-amber-100 text-amber-600' :
+                                            'bg-slate-100 text-slate-500'
+                                        }`}>
+                                        {client.payment_status === 'paid' ? 'Paid In Full' :
+                                            client.payment_status === 'partial' ? 'Partially Paid' : 'Unpaid'}
+                                    </span>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex gap-2 pt-2 border-t border-slate-50">
+                                    <button
+                                        onClick={handleGenerateLinkOpen}
+                                        disabled={linkLoading || !client.phone || ((client.total_deal_value || 0) - (client.amount_paid || 0) <= 0)}
+                                        className="flex-[2] bg-indigo-600 text-white rounded-xl py-3 text-xs md:text-sm font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {linkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                        Send Link (SMS)
+                                    </button>
+                                    <button
+                                        onClick={handleSendReminder}
+                                        disabled={!client.phone}
+                                        className="flex-1 bg-amber-500 text-white rounded-xl py-3 text-xs md:text-sm font-bold shadow-lg shadow-amber-200 hover:bg-amber-600 hover:shadow-amber-300 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Bell className="w-4 h-4" />
+                                        Reminder
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Custom Line Items (Moved from Middle) */}
+                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                                <Plus className="w-4 h-4 text-indigo-500" /> Custom Line Items
+                            </h3>
+                            <div className="space-y-3 mb-4">
+                                {(client.custom_items || []).map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-sm p-2 bg-slate-50 rounded-lg group border border-slate-100">
+                                        <span className="text-slate-700 font-medium">{item.name}</span>
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-bold text-slate-800">₹{item.price}</span>
+                                            <button onClick={() => removeCustomItem(idx)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
+                                                <XCircle className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {(!client.custom_items || client.custom_items.length === 0) && (
+                                    <p className="text-xs text-slate-400 italic text-center py-2">No custom items added.</p>
+                                )}
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Item Name"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-none"
+                                    value={newItemName}
+                                    onChange={(e) => setNewItemName(e.target.value)}
+                                />
+                                <div className="flex gap-2">
                                     <input
                                         type="number"
-                                        value={client.package_price}
-                                        readOnly
-                                        className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2.5 text-xl font-bold text-slate-500 outline-none cursor-not-allowed"
+                                        placeholder="Price"
+                                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-none"
+                                        value={newItemPrice}
+                                        onChange={(e) => setNewItemPrice(e.target.value)}
                                     />
+                                    <button onClick={addCustomItem} disabled={!newItemName} className="bg-indigo-600 text-white rounded-lg p-2 hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center w-10">
+                                        <Plus className="w-4 h-4" />
+                                    </button>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Payment Tracking Card */}
+                    {/* Middle Column */}
+                    <div className="col-span-12 lg:col-span-4 space-y-6">
+                        {/* Scope & Specs */}
                         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <CreditCard className="w-4 h-4" /> Payment Status
+                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                                <Layers className="w-5 h-5 text-indigo-500" /> Scope & Features
                             </h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Status</label>
-                                    <select
-                                        value={client.payment_status || 'unpaid'}
-                                        onChange={(e) => handleChange('payment_status', e.target.value)}
-                                        className={`w-full border border-slate-200 rounded-lg p-2.5 text-sm font-bold outline-none transition-colors 
-                                            ${client.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                                                client.payment_status === 'partial' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-slate-50 text-slate-600'}`}
-                                    >
-                                        <option value="unpaid">Unpaid</option>
-                                        <option value="partial">Partial Payment</option>
-                                        <option value="paid">Paid in Full</option>
-                                    </select>
+
+                            {/* Core Upgrades */}
+                            <div className="mb-6">
+                                <label className="block text-xs font-bold text-slate-700 mb-2">Core Upgrades</label>
+                                <div className="space-y-2">
+                                    {FEATURES.map(f => {
+                                        const isIncluded = (PLAN_INCLUDES[client.selected_package] || []).includes(f.id);
+                                        const isSelected = (client.core_upgrades || []).includes(f.id);
+
+                                        if (isIncluded) return null; // Don't show if already in plan
+
+                                        return (
+                                            <div key={f.id}
+                                                onClick={() => handleArrayToggle('core_upgrades', f.id)}
+                                                className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer border transition-all ${isSelected ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
+                                            >
+                                                <span>{f.name}</span>
+                                                <span className="text-xs font-bold">+₹{f.price}</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-1.5">Collected (₹)</label>
-                                        <input
-                                            type="number"
-                                            value={client.amount_paid || 0}
-                                            onChange={(e) => handleChange('amount_paid', Number(e.target.value))}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm font-bold text-emerald-600 outline-none focus:border-indigo-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-1.5">Total Deal (₹)</label>
-                                        <input
-                                            type="number"
-                                            value={client.total_deal_value || 0}
-                                            onChange={(e) => handleChange('total_deal_value', Number(e.target.value))}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm font-bold text-slate-700 outline-none focus:border-indigo-500"
-                                        />
-                                    </div>
-                                </div>
-                                {/* Progress Bar */}
-                                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-emerald-500 transition-all duration-500"
-                                        style={{ width: `${Math.min(((client.amount_paid || 0) / Math.max(client.total_deal_value || 1, 1)) * 100, 100)}%` }}
-                                    />
-                                </div>
-                                <div className="text-[10px] text-center text-slate-400 font-medium">
-                                    {Math.round(((client.amount_paid || 0) / Math.max(client.total_deal_value || 1, 1)) * 100)}% Collected
+                            </div>
+
+                            {/* Add-ons */}
+                            <div className="mb-6">
+                                <label className="block text-xs font-bold text-slate-700 mb-2">Add-ons & Services</label>
+                                <div className="space-y-2">
+                                    {ADDONS.map(a => (
+                                        <div key={a.id}
+                                            onClick={() => handleArrayToggle('add_ons', a.id)}
+                                            className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer border transition-all ${(client.add_ons || []).includes(a.id) ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
+                                        >
+                                            <span>{a.name}</span>
+                                            <span className="text-xs font-bold">+₹{a.price}</span>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Technical Links Card */}
+                    {/* Right Column */}
+                    <div className="col-span-12 lg:col-span-4 space-y-6">
+
+                        {/* Technical Links (Moved from Left) */}
                         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <Globe className="w-4 h-4" /> Deployment & Links
+                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                                <ExternalLink className="w-5 h-5 text-indigo-500" /> Technical Links
                             </h3>
                             <div className="space-y-3">
-                                <div className="group">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Github className="w-3.5 h-3.5 text-slate-400" />
-                                        <label className="text-xs font-medium text-slate-500">GitHub Repo</label>
-                                    </div>
+                                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                    <Globe className="w-4 h-4 text-indigo-400" />
                                     <input
                                         type="text"
-                                        placeholder="https://github.com/..."
-                                        value={client.github_repo || ''}
-                                        onChange={(e) => handleChange('github_repo', e.target.value)}
-                                        className="w-full bg-slate-50 border-b border-slate-200 p-2 text-xs text-slate-600 outline-none focus:border-indigo-500 transition-colors"
-                                    />
-                                </div>
-                                <div className="group">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Globe className="w-3.5 h-3.5 text-slate-400" />
-                                        <label className="text-xs font-medium text-slate-500">Live URL</label>
-                                        {client.live_url && <a href={client.live_url} target="_blank" className="ml-auto"><ExternalLink className="w-3 h-3 text-indigo-500" /></a>}
-                                    </div>
-                                    <input
-                                        type="text"
-                                        placeholder="https://..."
+                                        placeholder="Live Website URL"
+                                        className="bg-transparent text-sm w-full outline-none text-slate-600 placeholder:text-slate-300"
                                         value={client.live_url || ''}
                                         onChange={(e) => handleChange('live_url', e.target.value)}
-                                        className="w-full bg-slate-50 border-b border-slate-200 p-2 text-xs text-slate-600 outline-none focus:border-indigo-500 transition-colors"
                                     />
                                 </div>
-                                <div className="group">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Shield className="w-3.5 h-3.5 text-slate-400" />
-                                        <label className="text-xs font-medium text-slate-500">Admin Panel</label>
-                                    </div>
+                                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                    <Github className="w-4 h-4 text-slate-400" />
                                     <input
                                         type="text"
-                                        placeholder="https://.../admin"
-                                        value={client.admin_url || ''}
-                                        onChange={(e) => handleChange('admin_url', e.target.value)}
-                                        className="w-full bg-slate-50 border-b border-slate-200 p-2 text-xs text-slate-600 outline-none focus:border-indigo-500 transition-colors"
+                                        placeholder="GitHub Repository"
+                                        className="bg-transparent text-sm w-full outline-none text-slate-600 placeholder:text-slate-300"
+                                        value={client.github_repo || ''}
+                                        onChange={(e) => handleChange('github_repo', e.target.value)}
                                     />
                                 </div>
-                                <div className="group">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Layout className="w-3.5 h-3.5 text-slate-400" />
-                                        <label className="text-xs font-medium text-slate-500">Design File (Figma)</label>
-                                    </div>
+                                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                    <Layout className="w-4 h-4 text-pink-400" />
                                     <input
                                         type="text"
-                                        placeholder="Figma Link"
+                                        placeholder="Figma Design URL"
+                                        className="bg-transparent text-sm w-full outline-none text-slate-600 placeholder:text-slate-300"
                                         value={client.design_link || ''}
                                         onChange={(e) => handleChange('design_link', e.target.value)}
-                                        className="w-full bg-slate-50 border-b border-slate-200 p-2 text-xs text-slate-600 outline-none focus:border-indigo-500 transition-colors"
                                     />
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Middle Column: Features & Upgrades */}
-                    <div className="col-span-12 lg:col-span-8 space-y-6">
-                        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm min-h-[500px]">
-                            <h3 className="text-sm font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                <Database className="w-4 h-4 text-indigo-500" /> Project Specifications
+                        {/* Domains */}
+                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                                <Globe className="w-5 h-5 text-indigo-500" /> Domains Needed
                             </h3>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {/* Core Upgrades */}
-                                {/* Included Features & Upgrades Combined Column */}
-                                <div>
-                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Included in {PACKAGES.find(p => p.id === client.selected_package)?.name}</h4>
-                                    <div className="bg-slate-50 rounded-xl p-4 space-y-2 border border-slate-100 mb-6">
-                                        {/* Static Includes */}
-                                        {client.selected_package === 'basic' && (
-                                            <>
-                                                <div className="flex items-center gap-2 text-sm text-slate-700 font-medium">
-                                                    <CheckCircle className="w-4 h-4 text-emerald-500" /> 1-Page Landing
-                                                </div>
-                                                <div className="flex items-center gap-2 text-sm text-slate-700 font-medium">
-                                                    <CheckCircle className="w-4 h-4 text-emerald-500" /> 3-Day Delivery
-                                                </div>
-                                            </>
-                                        )}
-                                        {client.selected_package === 'business' && (
-                                            <div className="flex items-center gap-2 text-sm text-slate-700 font-medium">
-                                                <CheckCircle className="w-4 h-4 text-emerald-500" /> 5-Page Site
-                                            </div>
-                                        )}
-                                        {client.selected_package === 'premium' && (
-                                            <div className="flex items-center gap-2 text-sm text-slate-700 font-medium">
-                                                <CheckCircle className="w-4 h-4 text-emerald-500" /> 5-Page Site
-                                            </div>
-                                        )}
-
-                                        {/* Dynamic Includes based on Plan */}
-                                        {FEATURES.filter(f => PLAN_INCLUDES[client.selected_package]?.includes(f.id) && f.id !== 'pages_5').map(f => (
-                                            <div key={f.id} className="flex items-center gap-2 text-sm text-slate-700 font-medium">
-                                                <CheckCircle className="w-4 h-4 text-emerald-500" /> {f.name}
-                                            </div>
-                                        ))}
-
-                                        {((!PLAN_INCLUDES[client.selected_package]?.length) && client.selected_package === 'custom') && (
-                                            <span className="text-xs text-slate-400 italic">No base features included.</span>
-                                        )}
+                            <div className="space-y-2">
+                                {DOMAINS_LIST.map(d => (
+                                    <div key={d.id}
+                                        onClick={() => {
+                                            const has = (client.domains || []).some(x => x === d.id);
+                                            // Simple toggle logic for TLD as string
+                                            if (has) {
+                                                handleChange('domains', (client.domains || []).filter(x => x !== d.id));
+                                            } else {
+                                                handleChange('domains', [...(client.domains || []), d.id]);
+                                            }
+                                        }}
+                                        className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer border transition-all ${(client.domains || []).includes(d.id) ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
+                                    >
+                                        <span>{d.name}</span>
+                                        <span className="text-xs font-bold">+₹{d.price}</span>
                                     </div>
-
-                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Core Upgrades</h4>
-                                    <div className="space-y-2">
-                                        {FEATURES.filter(f => !PLAN_INCLUDES[client.selected_package]?.includes(f.id)).map(feat => {
-                                            const isSelected = client.core_upgrades?.includes(feat.id);
-
-                                            return (
-                                                <div
-                                                    key={feat.id}
-                                                    onClick={() => handleArrayToggle('core_upgrades', feat.id)}
-                                                    className="flex items-center gap-3 group px-2 py-1.5 rounded-lg transition-all cursor-pointer hover:bg-slate-50"
-                                                >
-                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors 
-                                                        ${isSelected
-                                                            ? 'bg-indigo-500 border-indigo-500'
-                                                            : 'border-slate-200 bg-white group-hover:border-indigo-300'
-                                                        }`}>
-                                                        {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
-                                                    </div>
-                                                    <span className={`text-sm flex-1 flex items-center justify-between ${isSelected ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>
-                                                        {feat.name}
-                                                        <span className="text-xs text-slate-400 group-hover:text-indigo-500">+₹{feat.price}</span>
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* Addons */}
-                                <div>
-                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Add-ons & Services</h4>
-                                    <div className="space-y-2">
-                                        {ADDONS.map(addon => (
-                                            <div key={addon.id} onClick={() => handleArrayToggle('add_ons', addon.id)} className="flex items-center gap-3 cursor-pointer group px-2 py-1.5 rounded-lg hover:bg-slate-50">
-                                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${client.add_ons?.includes(addon.id) ? 'bg-emerald-500 border-emerald-500' : 'border-slate-200 bg-white group-hover:border-emerald-300'}`}>
-                                                    {client.add_ons?.includes(addon.id) && <Check className="w-3.5 h-3.5 text-white" />}
-                                                </div>
-                                                <span className={`text-sm flex-1 flex items-center justify-between ${client.add_ons?.includes(addon.id) ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>
-                                                    {addon.name}
-                                                    <span className="text-xs text-slate-400 group-hover:text-emerald-500">+₹{addon.price}</span>
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                                ))}
                             </div>
-
-                            <div className="mt-8 pt-8 border-t border-slate-100">
-                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Domains & Custom Items</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    {/* Domains */}
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-2">Connected Domains (Per Year)</label>
-                                        <div className="flex flex-wrap gap-2 mb-2">
-                                            {client.domains?.map(d => (
-                                                <span key={d} className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">
-                                                    <Globe className="w-3 h-3 text-slate-400" /> {d}
-                                                    <button onClick={() => handleArrayToggle('domains', d)} className="hover:text-rose-500"><XCircle className="w-3 h-3" /></button>
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <input
-                                            type="text"
-                                            placeholder="Add domain (e.g. site.com) + Enter"
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleDomainToggle(e.currentTarget.value);
-                                                    e.currentTarget.value = '';
-                                                }
-                                            }}
-                                        />
-                                    </div>
-
-                                    {/* Custom Items */}
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-2">Custom Adjustments</label>
-                                        <div className="space-y-2 mb-3">
-                                            {client.custom_items?.map((item, i) => (
-                                                <div key={i} className="flex justify-between text-sm p-2 bg-slate-50 rounded-lg">
-                                                    <span>{item.name}</span>
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="font-bold text-slate-700">₹{item.price}</span>
-                                                        <button onClick={() => removeCustomItem(i)} className="text-slate-400 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <input type="text" placeholder="Item Name" value={newItemName} onChange={e => setNewItemName(e.target.value)} className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-emerald-500" />
-                                            <input type="number" placeholder="Price" value={newItemPrice} onChange={e => setNewItemPrice(e.target.value)} className="w-24 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-emerald-500" />
-                                            <button onClick={addCustomItem} className="bg-emerald-500 text-white p-2 rounded-lg hover:bg-emerald-600"><Plus className="w-4 h-4" /></button>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div className="mt-4 pt-4 border-t border-slate-100">
+                                <label className="block text-xs font-bold text-slate-700 mb-2">Specific Domain Names</label>
+                                <textarea
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 outline-none focus:border-indigo-500"
+                                    placeholder="Enter preferred domain names here (e.g. mybusiness.com)..."
+                                    rows={3}
+                                    value={client.domain_notes || ''}
+                                    onChange={(e) => handleChange('domain_notes', e.target.value)}
+                                />
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Internal Notes</h3>
+                        {/* Notes */}
+                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                                <FileText className="w-5 h-5 text-indigo-500" /> Client Notes
+                            </h3>
                             <textarea
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 outline-none focus:border-indigo-500 h-[200px]"
+                                placeholder="Add any specific requirements, meeting notes, or details about the client here..."
                                 value={client.internal_notes || ''}
                                 onChange={(e) => handleChange('internal_notes', e.target.value)}
-                                placeholder="Write internal notes, credentials, or reminders here..."
-                                className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-700 leading-relaxed outline-none focus:ring-2 focus:ring-indigo-100 resize-none"
-                            ></textarea>
+                            />
                         </div>
-                    </div>
 
+                    </div>
                 </div>
             </div>
         </div>

@@ -49,11 +49,19 @@ export interface Client {
     domains: string[];
     custom_items: { name: string, price: number }[];
 
+    display_picture?: string;
+
+    // Project Links
+    github_url?: string; // alias for repo
     github_repo?: string;
     live_url?: string;
     admin_url?: string;
+    figma_url?: string; // New
     design_link?: string;
 
+    // Notes
+    domain_notes?: string; // New
+    notes?: string; // New generalized note
     internal_notes?: string;
 
     // Payment Tracking
