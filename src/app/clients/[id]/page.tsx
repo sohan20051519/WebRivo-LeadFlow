@@ -182,7 +182,7 @@ export default function ClientPage() {
 
     const handleChange = (field: keyof Client, value: any) => {
         if (!client) return;
-        setClient({ ...client, [field]: value });
+        setClient(prev => prev ? ({ ...prev, [field]: value }) : null);
     };
 
     const handleArrayToggle = (field: 'core_upgrades' | 'add_ons' | 'domains', item: string) => {
@@ -278,6 +278,24 @@ export default function ClientPage() {
         } finally {
             setLinkLoading(false);
         }
+    };
+
+    const handleManualStatusChange = (status: string) => {
+        if (!client) return;
+        let newAmount = client.amount_paid || 0;
+
+        // If switching to PAID, set amount to Full Total
+        if (status === 'paid') {
+            newAmount = client.total_deal_value || 0;
+        }
+        // If switching to UNPAID, set amount to 0
+        else if (status === 'unpaid') {
+            newAmount = 0;
+        }
+        // If switching to PARTIAL, keep existing amount (or 0 if undefined)
+
+        handleChange('payment_status', status);
+        handleChange('amount_paid', newAmount);
     };
 
     const addCustomItem = () => {
@@ -447,23 +465,60 @@ export default function ClientPage() {
                                     <span className="text-xl font-bold text-indigo-700">₹{(client.total_deal_value || 0) - (client.amount_paid || 0)}</span>
                                 </div>
 
-                                {/* Payment Status Badge */}
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-slate-700">Current Status</span>
-                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md ${client.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-600' :
-                                        client.payment_status === 'partial' ? 'bg-amber-100 text-amber-600' :
-                                            'bg-slate-100 text-slate-500'
-                                        }`}>
-                                        {client.payment_status === 'paid' ? 'Paid In Full' :
-                                            client.payment_status === 'partial' ? 'Partially Paid' : 'Unpaid'}
-                                    </span>
+                                {/* Manual Payment Status Control */}
+                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Payment Status</label>
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${client.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-600' :
+                                            client.payment_status === 'partial' ? 'bg-amber-100 text-amber-600' :
+                                                'bg-slate-200 text-slate-500'
+                                            }`}>
+                                            {client.payment_status === 'paid' ? 'Paid' : client.payment_status === 'partial' ? 'Partial' : 'Unpaid'}
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {['unpaid', 'partial', 'paid'].map(status => (
+                                            <button
+                                                key={status}
+                                                onClick={() => handleManualStatusChange(status)}
+                                                className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-all ${client.payment_status === status
+                                                    ? (status === 'paid' ? 'bg-emerald-500 border-emerald-600 text-white shadow-md shadow-emerald-200' : status === 'partial' ? 'bg-amber-500 border-amber-600 text-white shadow-md shadow-amber-200' : 'bg-slate-500 border-slate-600 text-white shadow-md shadow-slate-200')
+                                                    : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
+                                                    }`}
+                                            >
+                                                {status}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Partial Amount Input */}
+                                    {client.payment_status === 'partial' && (
+                                        <div className="animate-in fade-in slide-in-from-top-2 duration-200 pt-2 border-t border-slate-200/50">
+                                            <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase">Amount Paid (Manual Input)</label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">₹</span>
+                                                <input
+                                                    type="number"
+                                                    value={client.amount_paid || ''}
+                                                    onChange={(e) => handleChange('amount_paid', parseFloat(e.target.value) || 0)}
+                                                    placeholder="Enter amount paid..."
+                                                    className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-300 font-bold"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Actions */}
                                 <div className="flex gap-2 pt-2 border-t border-slate-50">
                                     <button
                                         onClick={handleGenerateLinkOpen}
-                                        disabled={linkLoading || !client.phone || ((client.total_deal_value || 0) - (client.amount_paid || 0) <= 0)}
+                                        disabled={
+                                            linkLoading ||
+                                            !client.phone ||
+                                            ((client.total_deal_value || 0) - (client.amount_paid || 0) <= 0) ||
+                                            client.payment_status === 'paid'
+                                        }
                                         className="flex-[2] bg-indigo-600 text-white rounded-xl py-3 text-xs md:text-sm font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {linkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
