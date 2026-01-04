@@ -68,6 +68,22 @@ export interface Client {
     payment_status: 'unpaid' | 'partial' | 'paid';
     amount_paid: number;
     total_deal_value: number; // Manually set or calculated default
+
+    // Manual Payment Links
+    manual_payment_link?: string;
+    payment_completed_link?: string;
+
+    // Additional Payment Links
+    addon_links?: { title: string; url: string; price?: number }[];
 }
 
 export type ClientUpdatePayload = Partial<Omit<Client, 'id' | 'created_at'>>;
+
+export interface PaymentRecord {
+    id: string;
+    client_id: string;
+    amount: number;
+    proof_url?: string;
+    notes?: string;
+    created_at: string;
+}

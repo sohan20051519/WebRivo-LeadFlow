@@ -10,7 +10,6 @@
     },
     "dependencies": {
         "@supabase/supabase-js": "latest",
-        "cashfree-pg": "^5.1.0",
         "clsx": "latest",
         "jspdf": "^3.0.4",
         "jspdf-autotable": "^5.0.2",

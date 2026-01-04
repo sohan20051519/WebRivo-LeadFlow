@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Dataset, LeadRow, LeadStatus, Client, ClientUpdatePayload } from '@/types';
+import { Dataset, LeadRow, LeadStatus, Client, ClientUpdatePayload, PaymentRecord } from '@/types';
 
 interface Feedback {
     text: string;
@@ -46,6 +46,9 @@ interface LeadFlowContextType {
     createClient: (client: Omit<Client, 'id' | 'created_at'>) => Promise<string | null>;
     updateClient: (id: string, updates: ClientUpdatePayload) => Promise<void>;
     deleteClient: (id: string) => Promise<boolean>;
+    uploadPaymentProof: (file: File, clientId: string) => Promise<string | null>;
+    fetchPaymentRecords: (clientId: string) => Promise<PaymentRecord[]>;
+    addPaymentRecord: (record: Omit<PaymentRecord, 'id' | 'created_at'>) => Promise<boolean>;
 }
 
 const LeadFlowContext = createContext<LeadFlowContextType | undefined>(undefined);
@@ -381,6 +384,59 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         }
     }
 
+    const uploadPaymentProof = async (file: File, clientId: string): Promise<string | null> => {
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${clientId}-${Math.random()}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('payment-proofs')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage
+                .from('payment-proofs')
+                .getPublicUrl(filePath);
+
+            return data.publicUrl;
+        } catch (error: any) {
+            console.error('Error uploading payment proof:', error.message);
+            showFeedback(`Upload failed: ${error.message}`, 'error');
+            return null;
+        }
+    };
+
+    const fetchPaymentRecords = async (clientId: string): Promise<PaymentRecord[]> => {
+        try {
+            const { data, error } = await supabase
+                .from('payment_records')
+                .select('*')
+                .eq('client_id', clientId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data as PaymentRecord[];
+        } catch (e: any) {
+            console.error("Error fetching payments", e.message);
+            return [];
+        }
+    };
+
+    const addPaymentRecord = async (record: Omit<PaymentRecord, 'id' | 'created_at'>): Promise<boolean> => {
+        try {
+            const { error } = await supabase.from('payment_records').insert([record]);
+            if (error) throw error;
+            showFeedback("Payment recorded successfully", 'success');
+            return true;
+        } catch (e: any) {
+            console.error("Error adding payment", e.message);
+            showFeedback(`Failed to record payment: ${e.message}`, 'error');
+            return false;
+        }
+    };
+
     return (
         <LeadFlowContext.Provider
             value={{
@@ -412,13 +468,18 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
                 mobileMenuOpen,
                 setMobileMenuOpen,
                 feedback,
-                showFeedback
+                showFeedback,
+
+                uploadPaymentProof,
+                fetchPaymentRecords,
+                addPaymentRecord
             }}
         >
             {children}
         </LeadFlowContext.Provider>
     );
 }
+
 
 export function useLeadFlow() {
     const context = useContext(LeadFlowContext);

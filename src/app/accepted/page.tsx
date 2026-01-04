@@ -3,19 +3,23 @@
 import { useLeadFlow } from '@/context/LeadFlowContext';
 import { LeadStatus } from '@/types';
 import { useState, useMemo } from 'react';
-import { CheckCircle, PauseCircle, XCircle, Copy, Check, Edit2, Filter, User, Loader2 } from 'lucide-react';
+import { CheckCircle, PauseCircle, XCircle, Copy, Check, Edit2, Filter, User, Loader2, CreditCard } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-function ManageClientButton({ dsId, rowIdx, rowData }: { dsId: string, rowIdx: number, rowData: any }) {
+function ClientActions({ dsId, rowIdx, rowData }: { dsId: string, rowIdx: number, rowData: any }) {
     const { getMockClientBySource, createClient } = useLeadFlow();
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
+    const [loadingProfile, setLoadingProfile] = useState(false);
+    const [loadingPayment, setLoadingPayment] = useState(false);
 
-    const handleClick = async () => {
-        setLoading(true);
+    const handleNavigate = async (destination: 'profile' | 'payments') => {
+        if (destination === 'profile') setLoadingProfile(true);
+        else setLoadingPayment(true);
+
         try {
             // Check if profile exists
             let client = await getMockClientBySource(dsId, rowIdx);
+            let clientId = client?.id;
 
             if (!client) {
                 // Determine sensible defaults from row data
@@ -24,7 +28,7 @@ function ManageClientButton({ dsId, rowIdx, rowData }: { dsId: string, rowIdx: n
                 const email = rowData['Email'] || rowData['email'] || '';
                 const phone = rowData['Phone Number'] || rowData['Phone'] || rowData['mobile'] || '';
 
-                const newId = await createClient({
+                clientId = await createClient({
                     business_name: business,
                     contact_name: contact,
                     email: email,
@@ -40,22 +44,36 @@ function ManageClientButton({ dsId, rowIdx, rowData }: { dsId: string, rowIdx: n
                     custom_items: [],
                     internal_notes: ''
                 });
+            }
 
-                if (newId) {
-                    router.push(`/clients/${newId}`);
-                }
-            } else {
-                router.push(`/clients/${client.id}`);
+            if (clientId) {
+                router.push(destination === 'profile' ? `/clients/${clientId}` : `/clients/${clientId}/payments`);
             }
         } finally {
-            setLoading(false);
+            if (destination === 'profile') setLoadingProfile(false);
+            else setLoadingPayment(false);
         }
     };
 
     return (
-        <button onClick={handleClick} disabled={loading} className="p-1 md:p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all" title="Manage Client Profile">
-            {loading ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" /> : <User className="w-4 h-4 md:w-5 md:h-5" />}
-        </button>
+        <div className="flex items-center justify-center gap-1">
+            <button
+                onClick={() => handleNavigate('profile')}
+                disabled={loadingProfile || loadingPayment}
+                className="p-1 md:p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all border border-indigo-100"
+                title="Manage Client Profile"
+            >
+                {loadingProfile ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" /> : <User className="w-4 h-4 md:w-5 md:h-5" />}
+            </button>
+            <button
+                onClick={() => handleNavigate('payments')}
+                disabled={loadingProfile || loadingPayment}
+                className="p-1 md:p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all border border-emerald-100"
+                title="Manage Payments"
+            >
+                {loadingPayment ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" /> : <CreditCard className="w-4 h-4 md:w-5 md:h-5" />}
+            </button>
+        </div>
     );
 }
 
@@ -71,8 +89,8 @@ function PaymentStatusCell({ dsId, rowIdx }: { dsId: string, rowIdx: number }) {
     return (
         <div className="flex flex-col items-center gap-1">
             <span className={`text-[10px] font-bold uppercase tracking-wider rounded px-2.5 py-0.5 inline-block text-center ${client.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-600' :
-                    client.payment_status === 'partial' ? 'bg-amber-100 text-amber-600' :
-                        'bg-slate-100 text-slate-500'
+                client.payment_status === 'partial' ? 'bg-amber-100 text-amber-600' :
+                    'bg-slate-100 text-slate-500'
                 }`}>
                 {client.payment_status === 'paid' ? 'Paid' :
                     client.payment_status === 'partial' ? 'Partial' : 'Unpaid'}
@@ -192,7 +210,7 @@ export default function AcceptedPage() {
                                 return (
                                     <tr key={`${item.dsId}-${item.idx}`} className="group hover:bg-slate-50 transition-colors bg-emerald-50/20">
                                         <td className="sticky left-0 bg-white group-hover:bg-slate-50 px-2 py-3 md:py-4 border-r border-slate-100 z-10 box-border text-center">
-                                            <ManageClientButton dsId={item.dsId} rowIdx={item.idx} rowData={item.row} />
+                                            <ClientActions dsId={item.dsId} rowIdx={item.idx} rowData={item.row} />
                                         </td>
                                         <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-center">
                                             <ClientStatusCell dsId={item.dsId} rowIdx={item.idx} />

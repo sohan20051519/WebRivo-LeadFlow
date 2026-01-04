@@ -4,7 +4,7 @@ import { useLeadFlow } from '@/context/LeadFlowContext';
 import { Client, LeadStatus } from '@/types';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Upload, Save, CheckCircle, ExternalLink, Github, Database, Globe, Briefcase, DollarSign, Layout, Server, Shield, Layers, Plus, Trash2, Check, XCircle, ArrowLeft, CreditCard, Send, Loader2, Bell, FileText, Smartphone, MessageCircle, MapPin, Search, Calendar, Monitor, LifeBuoy } from 'lucide-react';
+import { Upload, Save, CheckCircle, ExternalLink, Github, Database, Globe, Briefcase, DollarSign, Layout, Server, Shield, Layers, Plus, Trash2, Check, XCircle, ArrowLeft, CreditCard, Send, Loader2, Bell, FileText, Smartphone, MessageCircle, MapPin, Search, Calendar, Monitor, LifeBuoy, Link as LinkIcon } from 'lucide-react';
 
 const PACKAGES = [
     { id: 'basic', name: 'Basic', price: 2999 },
@@ -55,11 +55,12 @@ const PLAN_INCLUDES: Record<string, string[]> = {
     custom: []
 };
 
+
 export default function ClientPage() {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { getClient, updateClient, deleteClient, updateLeadStatus, showFeedback } = useLeadFlow();
+    const { getClient, updateClient, deleteClient, updateLeadStatus, showFeedback, uploadPaymentProof } = useLeadFlow();
     const [client, setClient] = useState<Client | null>(null);
     const [loading, setLoading] = useState(true);
     const [autoSaving, setAutoSaving] = useState(false);
@@ -67,8 +68,9 @@ export default function ClientPage() {
 
     const [newItemName, setNewItemName] = useState('');
     const [newItemPrice, setNewItemPrice] = useState('');
-    const [linkLoading, setLinkLoading] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [uploadingProof, setUploadingProof] = useState(false);
+    const [dragActive, setDragActive] = useState(false);
 
     useEffect(() => {
         const load = async () => {
@@ -97,11 +99,8 @@ export default function ClientPage() {
                     payment_status: 'paid',
                     amount_paid: total
                 });
-                // Update local state immediately so UI reflects it
                 setClient(prev => prev ? ({ ...prev, payment_status: 'paid', amount_paid: total }) : null);
-
                 showFeedback("Payment confirmed! Status updated to PAID.", 'success');
-                // Clean URL
                 router.replace(`/clients/${client.id}`);
             };
             updatePayment();
@@ -114,7 +113,6 @@ export default function ClientPage() {
 
         const pkg = PACKAGES.find(p => p.id === client.selected_package);
         let total = pkg ? pkg.price : 0;
-
         const includedFeatures = PLAN_INCLUDES[client.selected_package] || [];
 
         if (client.core_upgrades) {
@@ -125,14 +123,12 @@ export default function ClientPage() {
                 }
             });
         }
-
         if (client.add_ons) {
             client.add_ons.forEach(id => {
                 const addon = ADDONS.find(a => a.id === id);
                 if (addon) total += addon.price;
             });
         }
-
         if (client.domains) {
             client.domains.forEach(domainStr => {
                 const lowerDomain = domainStr.toLowerCase();
@@ -140,24 +136,24 @@ export default function ClientPage() {
                 if (matchedTLD) total += matchedTLD.price;
             });
         }
-
         if (client.custom_items) {
-            client.custom_items.forEach(item => {
-                total += item.price || 0;
-            });
+            client.custom_items.forEach(item => { total += item.price || 0; });
         }
 
         if (total !== client.package_price || total !== client.total_deal_value) {
-            setClient(prev => prev ? ({ ...prev, package_price: total, total_deal_value: total }) : null);
+            setClient(prev => {
+                if (!prev) return null;
+                const newState: Client = { ...prev, package_price: total, total_deal_value: total };
+                if (newState.payment_status === 'paid' && total > (newState.amount_paid || 0)) {
+                    newState.payment_status = 'partial';
+                } else if (total <= (newState.amount_paid || 0) && newState.payment_status === 'partial') {
+                    newState.payment_status = 'paid';
+                }
+                return newState;
+            });
         }
 
-    }, [
-        client?.selected_package,
-        client?.core_upgrades,
-        client?.add_ons,
-        client?.custom_items,
-        client?.domains
-    ]);
+    }, [client?.selected_package, client?.core_upgrades, client?.add_ons, client?.custom_items, client?.domains]);
 
     // Auto-save
     useEffect(() => {
@@ -165,7 +161,6 @@ export default function ClientPage() {
             isInitialLoad.current = false;
             return;
         }
-
         const timeoutId = setTimeout(async () => {
             setAutoSaving(true);
             try {
@@ -176,7 +171,6 @@ export default function ClientPage() {
                 setAutoSaving(false);
             }
         }, 1000);
-
         return () => clearTimeout(timeoutId);
     }, [client]);
 
@@ -188,114 +182,100 @@ export default function ClientPage() {
     const handleArrayToggle = (field: 'core_upgrades' | 'add_ons' | 'domains', item: string) => {
         if (!client) return;
         const current = client[field] || [];
-        const updated = current.includes(item)
-            ? current.filter(i => i !== item)
-            : [...current, item];
+        const isAdding = !current.includes(item);
+
+        const updated = isAdding
+            ? [...current, item]
+            : current.filter(i => i !== item);
+
         handleChange(field, updated);
-    };
-
-    const handleGenerateLinkOpen = () => {
-        if (!client) return;
-        const outstanding = (client.total_deal_value || 0) - (client.amount_paid || 0);
-        if (outstanding <= 0) {
-            showFeedback("Client has no outstanding payment.", 'info');
-            return;
-        }
-        setShowPaymentModal(true);
-    };
-
-    const confirmGenerateLink = async () => {
-        if (!client) return;
-        const outstanding = (client.total_deal_value || 0) - (client.amount_paid || 0);
-
-        setLinkLoading(true);
-        try {
-            const res = await fetch('/api/cashfree/create-link', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    amount: outstanding,
-                    customer_phone: client.phone,
-                    customer_name: client.contact_name || client.business_name,
-                    link_purpose: `Payment for ${client.selected_package} package`,
-                    client_id: client.id,
-                    customer_email: client.email
-                })
-            });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Failed to generate link');
-
-            showFeedback(`Payment link created & SMS sent! Link ID: ${data.link_id}`, 'success');
-            setShowPaymentModal(false);
-
-        } catch (error: any) {
-            showFeedback(error.message, 'error');
-        } finally {
-            setLinkLoading(false);
-        }
     };
 
     const handleSendReminder = async () => {
         if (!client || !client.phone) return;
 
         const outstanding = (client.total_deal_value || 0) - (client.amount_paid || 0);
-        if (outstanding <= 0) {
-            showFeedback("Client has no outstanding payment.", 'info');
-            return;
-        }
+        const mainLink = client.manual_payment_link;
 
-        setLinkLoading(true);
-        try {
-            // Generate Link first
-            const res = await fetch('/api/cashfree/create-link', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    amount: outstanding,
-                    customer_phone: client.phone,
-                    customer_name: client.contact_name || client.business_name,
-                    link_purpose: `Payment for ${client.selected_package} package`,
-                    client_id: client.id,
-                    customer_email: client.email
-                })
+        // Build Breakdown Item List
+        let breakdownText = "";
+
+        // 1. Package
+        const pkg = PACKAGES.find(p => p.id === client.selected_package);
+        if (pkg) breakdownText += `• ${pkg.name} Package: ₹${pkg.price}\n`;
+
+        const includedFeatures = PLAN_INCLUDES[client.selected_package] || [];
+
+        // 2. Upgrades
+        if (client.core_upgrades) {
+            client.core_upgrades.forEach(uid => {
+                if (!includedFeatures.includes(uid)) {
+                    const f = FEATURES.find(x => x.id === uid);
+                    if (f) breakdownText += `• ${f.name}: ₹${f.price}\n`;
+                }
             });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Failed to generate link for reminder');
-
-            // Construct WhatsApp Message with Link
-            const linkUrl = data.link_url; // Captured from API response
-            const text = `Hi ${client.contact_name || 'Valued Client'},\n\nThis is a gentle reminder regarding the outstanding payment of ₹${outstanding} for your ${client.selected_package} package with WebRivo.\n\nPlease clear the dues at your earliest convenience to avoid any service interruption.\n\nType: Secure Payment Link\nPay Here: ${linkUrl}\n\nBest,\nWebRivo Team`;
-
-            const url = `https://wa.me/${client.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`;
-            window.open(url, '_blank');
-
-            showFeedback('Reminder link generated & WhatsApp opened!', 'success');
-
-        } catch (error: any) {
-            showFeedback(error.message, 'error');
-        } finally {
-            setLinkLoading(false);
         }
-    };
 
-    const handleManualStatusChange = (status: string) => {
-        if (!client) return;
-        let newAmount = client.amount_paid || 0;
-
-        // If switching to PAID, set amount to Full Total
-        if (status === 'paid') {
-            newAmount = client.total_deal_value || 0;
+        // 3. Addons
+        if (client.add_ons) {
+            client.add_ons.forEach(aid => {
+                const a = ADDONS.find(x => x.id === aid);
+                if (a) breakdownText += `• ${a.name}: ₹${a.price}\n`;
+            });
         }
-        // If switching to UNPAID, set amount to 0
-        else if (status === 'unpaid') {
-            newAmount = 0;
-        }
-        // If switching to PARTIAL, keep existing amount (or 0 if undefined)
 
-        handleChange('payment_status', status);
-        handleChange('amount_paid', newAmount);
+        // 4. Domains
+        if (client.domains) {
+            client.domains.forEach(dStr => {
+                const lower = dStr.toLowerCase();
+                const d = DOMAINS_LIST.find(x => lower.endsWith(`.${x.id}`) || lower === x.id);
+                if (d) breakdownText += `• Domain (${d.name}): ₹${d.price}\n`;
+            });
+        }
+
+        // 5. Custom
+        if (client.custom_items) {
+            client.custom_items.forEach(ci => {
+                breakdownText += `• ${ci.name}: ₹${ci.price}\n`;
+            });
+        }
+
+        // Construct Message
+        let text = `*INVOICE SUMMARY*\n`;
+        text += `For: *${client.business_name}* (${client.contact_name})\n`;
+        text += `--------------------------------\n`;
+        text += breakdownText;
+        text += `--------------------------------\n`;
+        text += `*TOTAL DEAL VALUE: ₹${client.total_deal_value}*\n`;
+        text += `✅ Amount Paid: ₹${client.amount_paid || 0}\n`;
+        text += `🚨 *OUTSTANDING DUE: ₹${outstanding}*\n\n`;
+
+        if (outstanding > 0) {
+            text += `Please clear the dues at your earliest convenience.\n\n`;
+        } else {
+            text += `All dues cleared. Thank you!\n\n`;
+        }
+
+        if (mainLink && outstanding > 0) {
+            text += `🔹 *Payment Link*: ${mainLink}\n`;
+        }
+
+        if (client.addon_links && client.addon_links.length > 0 && outstanding > 0) {
+            text += `\n*Specific Payment Links:*\n`;
+            client.addon_links.forEach(l => {
+                text += `🔸 ${l.title}: ${l.url}\n`;
+            });
+        }
+
+        text += `\nBest,\nWebRivo Team`;
+
+        const phone = client.phone.replace(/[^0-9]/g, '');
+        const formattedPhone = phone?.length === 10 ? `91${phone}` : phone;
+
+        const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+        window.open(url, '_blank');
+
+        showFeedback('WhatsApp opened with detailed invoice!', 'success');
     };
 
     const addCustomItem = () => {
@@ -314,63 +294,44 @@ export default function ClientPage() {
         handleChange('custom_items', newItems);
     }
 
+    // --- File Upload Logic ---
+    const processFile = async (file: File) => {
+        if (file.type !== 'application/pdf') { showFeedback('Please upload a PDF file only.', 'error'); return; }
+        setUploadingProof(true);
+        try {
+            const publicUrl = await uploadPaymentProof(file, client!.id);
+            if (publicUrl) {
+                let currentLinks: string[] = [];
+                try {
+                    if (client!.payment_completed_link) {
+                        currentLinks = client!.payment_completed_link.startsWith('[') ? JSON.parse(client!.payment_completed_link) : [client!.payment_completed_link];
+                    }
+                } catch (e) { currentLinks = [client!.payment_completed_link || '']; }
+                currentLinks.push(publicUrl);
+
+                // Update everything
+                const updates = {
+                    payment_completed_link: JSON.stringify(currentLinks),
+                    payment_status: 'paid' as const,
+                    amount_paid: client!.total_deal_value
+                };
+                setClient(prev => prev ? ({ ...prev, ...updates }) : null);
+                await updateClient(client!.id, updates);
+                showFeedback('Payment proof uploaded & Status updated to PAID!', 'success');
+            }
+        } finally { setUploadingProof(false); }
+    };
+    const handleProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => { if (!client || !e.target.files) return; processFile(e.target.files[0]); };
+    const handleDrag = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); if (e.type === "dragenter" || e.type === "dragover") setDragActive(true); else if (e.type === "dragleave") setDragActive(false); };
+    const handleDrop = async (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); if (!client || !e.dataTransfer.files) return; processFile(e.dataTransfer.files[0]); };
+
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Loading client profile...</div>;
     if (!client) return null;
 
+    const currentOutstanding = (client.total_deal_value || 0) - (client.amount_paid || 0);
+
     return (
         <div className="h-full flex flex-col bg-slate-50 overflow-hidden relative">
-
-            {/* Payment Confirmation Modal */}
-            {showPaymentModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="bg-slate-50 border-b border-slate-100 p-4">
-                            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                                <DollarSign className="w-5 h-5 text-emerald-500" /> Confirm Payment Link
-                            </h3>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div className="space-y-1">
-                                    <p className="text-slate-500 text-xs uppercase font-bold">Client</p>
-                                    <p className="font-medium text-slate-800">{client.business_name}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-slate-500 text-xs uppercase font-bold">Phone</p>
-                                    <p className="font-medium text-slate-800">{client.phone}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-slate-500 text-xs uppercase font-bold">Total Deal</p>
-                                    <p className="font-medium text-slate-800">₹{client.total_deal_value}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-slate-500 text-xs uppercase font-bold">Paid So Far</p>
-                                    <p className="font-medium text-emerald-600">₹{client.amount_paid || 0}</p>
-                                </div>
-                            </div>
-
-                            <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-sm font-bold text-indigo-900">Link Amount (Outstanding)</span>
-                                    <span className="text-xl font-bold text-indigo-600">₹{(client.total_deal_value || 0) - (client.amount_paid || 0)}</span>
-                                </div>
-                                <p className="text-xs text-indigo-500/80">This amount will be requested via Cashfree.</p>
-                            </div>
-
-                            <p className="text-xs text-slate-400 text-center italic">
-                                Clicking "Send" will trigger an SMS to the client with the payment link.
-                            </p>
-                        </div>
-                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
-                            <button onClick={() => setShowPaymentModal(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-white hover:border-slate-300 transition-all">Cancel</button>
-                            <button onClick={confirmGenerateLink} disabled={linkLoading} className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-md shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
-                                {linkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                {linkLoading ? 'Sending...' : 'Confirm & Send'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Header */}
             <div className="bg-white border-b border-slate-200 px-4 py-3 md:px-8 md:py-4 flex flex-col md:flex-row justify-between items-start md:items-center z-10 shadow-sm relative gap-4 md:gap-0">
@@ -462,10 +423,10 @@ export default function ClientPage() {
                                 {/* Outstanding */}
                                 <div className="flex justify-between items-center p-3 bg-indigo-50 rounded-xl border border-indigo-100">
                                     <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">Outstanding</span>
-                                    <span className="text-xl font-bold text-indigo-700">₹{(client.total_deal_value || 0) - (client.amount_paid || 0)}</span>
+                                    <span className="text-xl font-bold text-indigo-700">₹{currentOutstanding}</span>
                                 </div>
 
-                                {/* Manual Payment Status Control */}
+                                {/* Financial Overview */}
                                 <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-3">
                                     <div className="flex justify-between items-center">
                                         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Payment Status</label>
@@ -476,62 +437,20 @@ export default function ClientPage() {
                                             {client.payment_status === 'paid' ? 'Paid' : client.payment_status === 'partial' ? 'Partial' : 'Unpaid'}
                                         </span>
                                     </div>
-                                    <div className="flex gap-2">
-                                        {['unpaid', 'partial', 'paid'].map(status => (
+
+                                    <div className="space-y-3 pt-2">
+                                        <div className="pt-2">
                                             <button
-                                                key={status}
-                                                onClick={() => handleManualStatusChange(status)}
-                                                className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-all ${client.payment_status === status
-                                                    ? (status === 'paid' ? 'bg-emerald-500 border-emerald-600 text-white shadow-md shadow-emerald-200' : status === 'partial' ? 'bg-amber-500 border-amber-600 text-white shadow-md shadow-amber-200' : 'bg-slate-500 border-slate-600 text-white shadow-md shadow-slate-200')
-                                                    : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
-                                                    }`}
+                                                onClick={() => router.push(`/clients/${client.id}/payments`)}
+                                                className="w-full py-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-center gap-2 text-indigo-700 font-bold hover:bg-indigo-100 transition-colors"
                                             >
-                                                {status}
+                                                <div className="p-1 bg-white rounded-full text-indigo-500">
+                                                    <CreditCard className="w-4 h-4" />
+                                                </div>
+                                                Manage Payments & History
                                             </button>
-                                        ))}
-                                    </div>
-
-                                    {/* Partial Amount Input */}
-                                    {client.payment_status === 'partial' && (
-                                        <div className="animate-in fade-in slide-in-from-top-2 duration-200 pt-2 border-t border-slate-200/50">
-                                            <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase">Amount Paid (Manual Input)</label>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">₹</span>
-                                                <input
-                                                    type="number"
-                                                    value={client.amount_paid || ''}
-                                                    onChange={(e) => handleChange('amount_paid', parseFloat(e.target.value) || 0)}
-                                                    placeholder="Enter amount paid..."
-                                                    className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-300 font-bold"
-                                                />
-                                            </div>
                                         </div>
-                                    )}
-                                </div>
-
-                                {/* Actions */}
-                                <div className="flex gap-2 pt-2 border-t border-slate-50">
-                                    <button
-                                        onClick={handleGenerateLinkOpen}
-                                        disabled={
-                                            linkLoading ||
-                                            !client.phone ||
-                                            ((client.total_deal_value || 0) - (client.amount_paid || 0) <= 0) ||
-                                            client.payment_status === 'paid'
-                                        }
-                                        className="flex-[2] bg-indigo-600 text-white rounded-xl py-3 text-xs md:text-sm font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {linkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                        Send Link (SMS)
-                                    </button>
-                                    <button
-                                        onClick={handleSendReminder}
-                                        disabled={!client.phone}
-                                        className="flex-1 bg-amber-500 text-white rounded-xl py-3 text-xs md:text-sm font-bold shadow-lg shadow-amber-200 hover:bg-amber-600 hover:shadow-amber-300 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <Bell className="w-4 h-4" />
-                                        Reminder
-                                    </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -669,6 +588,20 @@ export default function ClientPage() {
                                         onChange={(e) => handleChange('design_link', e.target.value)}
                                     />
                                 </div>
+                            </div>
+
+                            {/* NEW: QUICK REMINDER SECTION */}
+                            <div className="mt-4 pt-4 border-t border-slate-100">
+                                <h4 className="text-xs font-bold text-slate-700 uppercase mb-2">Quick Actions</h4>
+                                <button
+                                    onClick={handleSendReminder}
+                                    className="w-full py-2 bg-green-500 text-white rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-green-600 shadow-sm shadow-green-200 transition-all"
+                                >
+                                    <MessageCircle className="w-4 h-4" /> Send Payment Reminder
+                                </button>
+                                <p className="text-[10px] text-slate-400 mt-2 text-center">
+                                    Sends WhatsApp message with detailed cost breakdown & payment links.
+                                </p>
                             </div>
                         </div>
 
