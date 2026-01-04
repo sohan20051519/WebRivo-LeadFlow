@@ -31,10 +31,38 @@ export async function POST(request: Request) {
         };
 
         const apiVersion = process.env.CASHFREE_API_VERSION || '2023-08-01';
+        const appId = process.env.CASHFREE_APP_ID;
+        const secretKey = process.env.CASHFREE_SECRET_KEY;
 
-        // Instantiate for prototype methods
+
+        // Use string "SANDBOX" or "PRODUCTION" directly to avoid undefined enum issues
+        const env = process.env.CASHFREE_ENV === 'production' ? 'PRODUCTION' : 'SANDBOX';
+
+        console.log("CF Debug: AppID:", appId ? "Set" : "Missing");
+        console.log("CF Debug: Secret:", secretKey ? "Set" : "Missing");
+        console.log("CF Debug: Env:", env);
+
+        // Force set static config
+        // @ts-ignore
+        Cashfree.XClientId = appId;
+        // @ts-ignore
+        Cashfree.XClientSecret = secretKey;
+        // @ts-ignore
+        Cashfree.XEnvironment = env;
+
+        // Instantiate
         // @ts-ignore
         const cf = new Cashfree();
+
+        // Force set instance config (just in case)
+        // @ts-ignore
+        cf.XClientId = appId;
+        // @ts-ignore
+        cf.XClientSecret = secretKey;
+        // @ts-ignore
+        cf.XEnvironment = env;
+
+        console.log("CF Debug: Configured. Calling PGCreateLink...");
 
         // @ts-ignore
         const response = await cf.PGCreateLink(apiVersion, requestData);
