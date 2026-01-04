@@ -1,68 +1,7 @@
-"use client";
-
 import { useLeadFlow } from '@/context/LeadFlowContext';
 import { LeadStatus } from '@/types';
 import { useState, useMemo } from 'react';
-import { CheckCircle, PauseCircle, XCircle, Copy, Check, Edit2, Filter, User, Loader2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-
-function ManageClientButton({ dsId, rowIdx, rowData }: { dsId: string, rowIdx: number, rowData: any }) {
-    const { getMockClientBySource, createClient } = useLeadFlow();
-    const router = useRouter();
-    const [loading, setLoading] = useState(false);
-
-    const handleClick = async () => {
-        setLoading(true);
-        try {
-            // Check if profile exists
-            let client = await getMockClientBySource(dsId, rowIdx);
-
-            if (!client) {
-                // Determine sensible defaults from row data
-                const business = rowData['Business Name'] || rowData['Company'] || rowData['Organization'] || 'Unknown Business';
-                const contact = rowData['Contact Person'] || rowData['Name'] || '';
-                const email = rowData['Email'] || rowData['email'] || '';
-                const phone = rowData['Phone Number'] || rowData['Phone'] || rowData['mobile'] || '';
-
-                const newId = await createClient({
-                    business_name: business,
-                    contact_name: contact,
-                    email: email,
-                    phone: phone,
-                    source_dataset_id: dsId,
-                    source_row_index: rowIdx,
-                    status: 'onboarding',
-                    selected_package: 'basic',
-                    package_price: 0,
-                    core_upgrades: [],
-                    add_ons: [],
-                    domains: [],
-                    custom_items: [],
-                    internal_notes: ''
-                });
-
-                if (newId) {
-                    router.push(`/clients/${newId}`);
-                }
-            } else {
-                router.push(`/clients/${client.id}`);
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <button
-            onClick={handleClick}
-            disabled={loading}
-            className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-500 hover:text-white transition-all shadow-sm ring-1 ring-indigo-200"
-            title="Manage Client Profile"
-        >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <User className="w-4 h-4" />}
-        </button>
-    );
-}
+import { CheckCircle, PauseCircle, XCircle, Copy, Check, Edit2, Filter } from 'lucide-react';
 
 export default function WaitlistPage() {
     const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm } = useLeadFlow();
@@ -137,8 +76,6 @@ export default function WaitlistPage() {
                                                 <button onClick={() => updateLeadStatus(item.dsId, item.idx, LeadStatus.ACCEPTED)} className="p-1.5 rounded-lg text-slate-300 hover:bg-emerald-50 hover:text-emerald-500 transition-all hover:scale-105" title="Accept"><CheckCircle className="w-4 h-4 md:w-5 md:h-5" /></button>
                                                 <button onClick={() => updateLeadStatus(item.dsId, item.idx, LeadStatus.WAIT)} className="p-1.5 rounded-lg bg-amber-500 text-white shadow-md shadow-amber-200 ring-2 ring-amber-100 transition-all scale-105"><PauseCircle className="w-4 h-4 md:w-5 md:h-5" /></button>
                                                 <button onClick={() => updateLeadStatus(item.dsId, item.idx, LeadStatus.DECLINED)} className="p-1.5 rounded-lg text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition-all hover:scale-105" title="Decline"><XCircle className="w-4 h-4 md:w-5 md:h-5" /></button>
-                                                <div className="h-4 w-px bg-slate-200 mx-1"></div>
-                                                <ManageClientButton dsId={item.dsId} rowIdx={item.idx} rowData={item.row} />
                                             </div>
                                         </td>
                                         {headers.map((h, i) => {

@@ -59,8 +59,43 @@ function ManageClientButton({ dsId, rowIdx, rowData }: { dsId: string, rowIdx: n
     );
 }
 
+
+// ... existing ManageClientButton ...
+
+function ClientStatusCell({ dsId, rowIdx }: { dsId: string, rowIdx: number }) {
+    const { clients } = useLeadFlow();
+    // Find client in the global context state
+    const client = clients.find(c => c.source_dataset_id === dsId && c.source_row_index === rowIdx);
+
+    if (!client) return <span className="text-slate-300 text-[10px] italic">No Client Profile</span>;
+
+    const statusColors: Record<string, string> = {
+        'onboarding': 'bg-blue-50 text-blue-600',
+        'in_progress': 'bg-amber-50 text-amber-600',
+        'review': 'bg-purple-50 text-purple-600',
+        'live': 'bg-emerald-50 text-emerald-600',
+        'maintenance': 'bg-rose-50 text-rose-600',
+        'completed': 'bg-slate-50 text-slate-600'
+    };
+
+    const statusLabels: Record<string, string> = {
+        'onboarding': 'Onboarding',
+        'in_progress': 'Development',
+        'review': 'In Review',
+        'live': 'Live',
+        'maintenance': 'Maintenance',
+        'completed': 'Completed'
+    };
+
+    return (
+        <span className={`text-[10px] font-bold uppercase tracking-wider rounded px-2.5 py-1 inline-block min-w-[100px] text-center ${statusColors[client.status] || 'bg-slate-100 text-slate-500'}`}>
+            {statusLabels[client.status] || client.status}
+        </span>
+    );
+}
+
 export default function AcceptedPage() {
-    const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm } = useLeadFlow();
+    const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm, clients } = useLeadFlow(); // added clients
     const [editingCell, setEditingCell] = useState<{ dsId: string, rowIndex: number, column: string, value: string } | null>(null);
     const [copiedText, setCopiedText] = useState<string | null>(null);
 
@@ -86,11 +121,8 @@ export default function AcceptedPage() {
         return rows;
     }, [datasets, searchTerm]);
 
-    // Get headers from first dataset that has headers? Ideally merge headers or just take union.
-    // App.tsx logic: if (filtered.length > 0 && headers.length === 0) headers = ds.headers;
     const headers = useMemo(() => {
         if (datasets.length === 0) return [];
-        // Find a dataset that contributes rows
         const contributingDs = datasets.find(ds => ds.data.some((_, i) => ds.statuses[i] === LeadStatus.ACCEPTED));
         return contributingDs ? contributingDs.headers : (datasets[0]?.headers || []);
     }, [datasets]);
@@ -118,6 +150,9 @@ export default function AcceptedPage() {
                             <th className="sticky left-0 bg-slate-50 px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-slate-100 w-16">
                                 {/* Actions */}
                             </th>
+                            <th className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[120px]">
+                                Client Status
+                            </th>
                             {headers.map((h, i) => (
                                 <th key={i} className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[120px] md:min-w-[150px]">{h}</th>
                             ))}
@@ -132,6 +167,9 @@ export default function AcceptedPage() {
                                     <tr key={`${item.dsId}-${item.idx}`} className="group hover:bg-slate-50 transition-colors bg-emerald-50/20">
                                         <td className="sticky left-0 bg-white group-hover:bg-slate-50 px-2 py-3 md:py-4 border-r border-slate-100 z-10 box-border text-center">
                                             <ManageClientButton dsId={item.dsId} rowIdx={item.idx} rowData={item.row} />
+                                        </td>
+                                        <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-center">
+                                            <ClientStatusCell dsId={item.dsId} rowIdx={item.idx} />
                                         </td>
                                         {headers.map((h, i) => {
                                             const cellValue = item.row[h] || '';
@@ -157,7 +195,7 @@ export default function AcceptedPage() {
                                 );
                             })
                         ) : (
-                            <tr><td colSpan={headers.length + 2} className="py-20 text-center text-slate-400"><div className="flex flex-col items-center gap-2"><Filter className="w-8 h-8 opacity-20" /><p className="text-sm font-medium">No accepted leads found.</p></div></td></tr>
+                            <tr><td colSpan={headers.length + 3} className="py-20 text-center text-slate-400"><div className="flex flex-col items-center gap-2"><Filter className="w-8 h-8 opacity-20" /><p className="text-sm font-medium">No accepted leads found.</p></div></td></tr>
                         )}
                     </tbody>
                 </table>
@@ -165,3 +203,4 @@ export default function AcceptedPage() {
         </div>
     );
 }
+
