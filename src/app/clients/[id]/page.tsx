@@ -129,6 +129,8 @@ export default function ClientPage() {
                 if (addon) total += addon.price;
             });
         }
+
+        // Correct Domain Pricing Logic
         if (client.domains) {
             let domainTotal = 0;
             const selectedDomains: { id: string, price: number }[] = [];
@@ -141,26 +143,45 @@ export default function ClientPage() {
                 }
             });
 
+            // Calculate total BEFORE discount
+            let rawDomainTotal = 0;
             selectedDomains.forEach(d => {
-                let price = d.price;
-                if (client.selected_package === 'business' && d.id === 'in') {
-                    price = 0;
-                }
-                domainTotal += price;
+                rawDomainTotal += d.price;
             });
 
-            if (client.selected_package === 'premium' && selectedDomains.length > 0) {
+            // Apply Discounts
+            let discount = 0;
+            if (client.selected_package === 'business') {
+                // Business: .in is free
+                const inDomain = selectedDomains.find(d => d.id === 'in');
+                if (inDomain) {
+                    discount += inDomain.price;
+                }
+            } else if (client.selected_package === 'premium' && selectedDomains.length > 0) {
+                // Premium: Max price domain is free
                 const maxPrice = Math.max(...selectedDomains.map(d => d.price));
-                domainTotal -= maxPrice;
+                discount += maxPrice;
             }
 
-            total += domainTotal;
+            total += (rawDomainTotal - discount);
         }
+
         if (client.custom_items) {
             client.custom_items.forEach(item => { total += item.price || 0; });
         }
 
-        if (total !== client.package_price || total !== client.total_deal_value) {
+        // Auto-correct missing default domains (Enforce business rules)
+        let domainsUpdate: string[] | null = null;
+        const currentDomains = client.domains || [];
+        if (client.selected_package === 'business' && !currentDomains.includes('in')) {
+             domainsUpdate = [...currentDomains, 'in'];
+        } else if (client.selected_package === 'premium' && currentDomains.length === 0) {
+             domainsUpdate = ['com'];
+        }
+
+        const needsUpdate = total !== client.package_price || total !== client.total_deal_value || domainsUpdate !== null;
+
+        if (needsUpdate) {
             setClient(prev => {
                 if (!prev) return null;
                 const paid = prev.amount_paid || 0;
@@ -172,10 +193,20 @@ export default function ClientPage() {
                 } else if (paid > 0 && paid < total) {
                     newStatus = 'partial';
                 } else {
-                    newStatus = 'unpaid'; // Or whatever default is (could be mapped to 'onboarding' status logic, but usually payment_status is distinct)
+                    newStatus = 'unpaid';
                 }
 
-                return { ...prev, package_price: total, total_deal_value: total, payment_status: newStatus };
+                const updates: any = {
+                    package_price: total,
+                    total_deal_value: total,
+                    payment_status: newStatus
+                };
+
+                if (domainsUpdate) {
+                    updates.domains = domainsUpdate;
+                }
+
+                return { ...prev, ...updates };
             });
         }
 
