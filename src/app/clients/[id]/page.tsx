@@ -130,11 +130,31 @@ export default function ClientPage() {
             });
         }
         if (client.domains) {
+            let domainTotal = 0;
+            const selectedDomains: { id: string, price: number }[] = [];
+
             client.domains.forEach(domainStr => {
                 const lowerDomain = domainStr.toLowerCase();
                 const matchedTLD = DOMAINS_LIST.find(d => lowerDomain.endsWith(`.${d.id}`) || lowerDomain === d.id);
-                if (matchedTLD) total += matchedTLD.price;
+                if (matchedTLD) {
+                    selectedDomains.push(matchedTLD);
+                }
             });
+
+            selectedDomains.forEach(d => {
+                let price = d.price;
+                if (client.selected_package === 'business' && d.id === 'in') {
+                    price = 0;
+                }
+                domainTotal += price;
+            });
+
+            if (client.selected_package === 'premium' && selectedDomains.length > 0) {
+                const maxPrice = Math.max(...selectedDomains.map(d => d.price));
+                domainTotal -= maxPrice;
+            }
+
+            total += domainTotal;
         }
         if (client.custom_items) {
             client.custom_items.forEach(item => { total += item.price || 0; });
