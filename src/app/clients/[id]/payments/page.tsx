@@ -284,9 +284,34 @@ export default function ClientPaymentsPage() {
 
         // 4. Domains
         if (c.domains) {
+            const selectedDomains: typeof DOMAINS_LIST = [];
             c.domains.forEach(did => {
                 const d = DOMAINS_LIST.find(x => x.id === did);
-                if (d) items.push({ name: d.name, type: 'domain', price: d.price });
+                if (d) selectedDomains.push(d);
+            });
+
+            // Logic to track which one is free for display purposes
+            // This is slightly complex because we need to know WHICH one is free to set price to 0 in the list
+            let freeDomainId: string | null = null;
+
+            if (c.selected_package === 'business') {
+                freeDomainId = 'in';
+            } else if (c.selected_package === 'premium' && selectedDomains.length > 0) {
+                const maxPrice = Math.max(...selectedDomains.map(d => d.price));
+                const freeOne = selectedDomains.find(d => d.price === maxPrice);
+                if (freeOne) freeDomainId = freeOne.id;
+            }
+
+            selectedDomains.forEach(d => {
+                let price = d.price;
+                if (d.id === freeDomainId && (c.selected_package === 'business' ? d.id === 'in' : true)) {
+                     // Extra check: For business, only 'in' is free. For premium, the chosen one is free.
+                     // My logic above sets freeDomainId='in' for business.
+                     // But wait, if they selected '.com' and '.in' in Business, only '.in' is free.
+                     // If they didn't select '.in', freeDomainId is still 'in' but it won't match any d.id unless 'in' is selected.
+                     price = 0;
+                }
+                items.push({ name: d.name, type: 'domain', price });
             });
         }
 

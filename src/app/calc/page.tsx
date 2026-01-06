@@ -271,8 +271,25 @@ export default function CalculatorPage() {
                         <select
                             value={calcPlanId}
                             onChange={(e) => {
-                                setCalcPlanId(e.target.value);
+                                const newPlan = e.target.value;
+                                setCalcPlanId(newPlan);
                                 setCalcUpgrades(new Set());
+
+                                // Auto-select domains based on plan logic
+                                if (newPlan === 'business') {
+                                    setCalcDomains(prev => {
+                                        const next = new Set(prev);
+                                        next.add('in');
+                                        return next;
+                                    });
+                                } else if (newPlan === 'premium') {
+                                    setCalcDomains(prev => {
+                                        if (prev.size === 0) {
+                                            return new Set(['com']);
+                                        }
+                                        return prev;
+                                    });
+                                }
                             }}
                             className="w-full bg-black text-white border border-[#444] p-1.5 rounded-lg text-sm outline-none focus:ring-1 focus:ring-[#4fd1a5]"
                         >
