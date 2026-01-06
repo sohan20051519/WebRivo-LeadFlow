@@ -631,23 +631,55 @@ export default function ClientPage() {
                                 <Globe className="w-5 h-5 text-indigo-500" /> Domains Needed
                             </h3>
                             <div className="space-y-2">
-                                {DOMAINS_LIST.map(d => (
-                                    <div key={d.id}
-                                        onClick={() => {
-                                            const has = (client.domains || []).some(x => x === d.id);
-                                            // Simple toggle logic for TLD as string
-                                            if (has) {
-                                                handleChange('domains', (client.domains || []).filter(x => x !== d.id));
-                                            } else {
-                                                handleChange('domains', [...(client.domains || []), d.id]);
+                                {DOMAINS_LIST.map(d => {
+                                    const isSelected = (client.domains || []).includes(d.id);
+                                    let isFree = false;
+
+                                    if (client.selected_package === 'business' && d.id === 'in') {
+                                        isFree = true;
+                                    } else if (client.selected_package === 'premium') {
+                                        // Calculate if this specific domain is the free one
+                                        // Logic: If selected, and it's the most expensive one selected (or tied), it's free.
+                                        // If not selected, we don't show it as free yet (or maybe we should? No, logic depends on selection).
+                                        if (isSelected) {
+                                            const selectedDomains = (client.domains || [])
+                                                .map(id => DOMAINS_LIST.find(x => x.id === id))
+                                                .filter(x => x !== undefined) as typeof DOMAINS_LIST;
+
+                                            const maxPrice = Math.max(...selectedDomains.map(x => x.price));
+                                            // To ensure deterministic behavior if prices are equal, we can sort or just pick first found.
+                                            // The calculation logic uses 'find', which picks first match.
+                                            // But here we need to match the exact logic of the calculation useEffect.
+                                            // Calculation: domainTotal -= maxPrice.
+                                            // So effectively, ONE domain worth maxPrice is free.
+                                            // Which one? The logic `domainTotal -= maxPrice` doesn't specify *which* one visually,
+                                            // but effectively the bill is reduced.
+                                            // Visually, we should mark the one that "triggers" the discount as free,
+                                            // OR just mark the most expensive one as free.
+                                            const freeDomain = selectedDomains.find(x => x.price === maxPrice);
+                                            if (freeDomain?.id === d.id) {
+                                                isFree = true;
                                             }
-                                        }}
-                                        className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer border transition-all ${(client.domains || []).includes(d.id) ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
-                                    >
-                                        <span>{d.name}</span>
-                                        <span className="text-xs font-bold">+₹{d.price}</span>
-                                    </div>
-                                ))}
+                                        }
+                                    }
+
+                                    return (
+                                        <div key={d.id}
+                                            onClick={() => {
+                                                const has = (client.domains || []).some(x => x === d.id);
+                                                if (has) {
+                                                    handleChange('domains', (client.domains || []).filter(x => x !== d.id));
+                                                } else {
+                                                    handleChange('domains', [...(client.domains || []), d.id]);
+                                                }
+                                            }}
+                                            className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer border transition-all ${isSelected ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
+                                        >
+                                            <span>{d.name}</span>
+                                            <span className="text-xs font-bold">{isFree ? 'Free (Included)' : `+₹${d.price}`}</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                             <div className="mt-4 pt-4 border-t border-slate-100">
                                 <label className="block text-xs font-bold text-slate-700 mb-2">Specific Domain Names</label>

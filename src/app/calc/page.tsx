@@ -408,7 +408,9 @@ export default function CalculatorPage() {
                                                 {isSelected && <Check className="w-2.5 h-2.5 text-black font-bold" />}
                                             </div>
                                         </div>
-                                        <span className="text-[#4fd1a5] text-[10px] font-bold">{isFree ? 'Free' : `+ ₹${domain.price}`}</span>
+                                        <span className="text-[#4fd1a5] text-[10px] font-bold">
+                                            {isFree ? 'Free (Included)' : `+ ₹${domain.price}`}
+                                        </span>
                                     </div>
                                 );
                             })}
