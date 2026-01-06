@@ -18,7 +18,7 @@ const PRODUCTS = [
         name: 'Business Package',
         price: '₹7,999',
         description: 'Growth-focused solution for expanding companies.',
-        features: ['5-Page Website', 'SEO Core Optimization', 'Mobile Responsive', 'WhatsApp Integration', 'Basic Analytics'],
+        features: ['5-Page Website', 'SEO Core Optimization', 'Mobile Responsive', 'WhatsApp Integration', 'Basic Analytics', '.in Domain Included'],
         icon: Globe,
         color: 'text-indigo-500',
         bg: 'bg-indigo-50',
@@ -29,7 +29,7 @@ const PRODUCTS = [
         name: 'Premium Package',
         price: '₹19,999',
         description: 'Comprehensive digital ecosystem for market leaders.',
-        features: ['5-Page Dynamic Site', 'Booking System', 'Payment Gateway', 'Admin Dashboard', 'Google Maps & GBP', 'Priority Support'],
+        features: ['5-Page Dynamic Site', 'Booking System', 'Payment Gateway', 'Admin Dashboard', 'Google Maps & GBP', 'Priority Support', '1 Free Domain (.com/.in/.org/.xyz)'],
         icon: Database,
         color: 'text-purple-500',
         bg: 'bg-purple-50'

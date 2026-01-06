@@ -116,7 +116,27 @@ export default function CalculatorPage() {
         let t = CALCULATOR_PLANS[calcPlanId].price;
         calcUpgrades.forEach(id => { t += CALCULATOR_FEATURES[id]?.price || 0; });
         calcAddons.forEach(id => { t += CALCULATOR_ADDONS.find(a => a.id === id)?.price || 0; });
-        calcDomains.forEach(id => { t += CALCULATOR_DOMAINS.find(d => d.id === id)?.price || 0; });
+
+        // Domain Logic
+        let domainTotal = 0;
+        const selectedDomains = Array.from(calcDomains).map(id => CALCULATOR_DOMAINS.find(d => d.id === id)).filter(d => d !== undefined) as typeof CALCULATOR_DOMAINS;
+
+        selectedDomains.forEach(d => {
+            let price = d.price;
+            if (calcPlanId === 'business' && d.id === 'in') {
+                price = 0;
+            }
+            domainTotal += price;
+        });
+
+        if (calcPlanId === 'premium' && selectedDomains.length > 0) {
+            // Find max price to deduct (make the most expensive one free)
+            const maxPrice = Math.max(...selectedDomains.map(d => d.price));
+            domainTotal -= maxPrice;
+        }
+
+        t += domainTotal;
+
         calcCustomItems.forEach(item => { t += item.price; });
         return t;
     }, [calcPlanId, calcUpgrades, calcAddons, calcDomains, calcCustomItems]);
@@ -266,14 +286,26 @@ export default function CalculatorPage() {
                     <div className="flex-1 flex flex-col min-h-0 gap-3">
                         <h3 className="text-xs font-bold text-[#4fd1a5] flex items-center gap-1.5 uppercase tracking-wider"><CheckSquare className="w-3.5 h-3.5" /> Included</h3>
                         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 pr-1 max-h-32 md:max-h-none">
-                            {CALCULATOR_PLANS[calcPlanId].included.length === 0 ? (
+                            {CALCULATOR_PLANS[calcPlanId].included.length === 0 && calcPlanId !== 'business' && calcPlanId !== 'premium' ? (
                                 <p className="text-gray-600 text-[10px] italic">No base features.</p>
                             ) : (
-                                CALCULATOR_PLANS[calcPlanId].included.map(fid => (
-                                    <div key={fid} className="flex items-center gap-2 p-1.5 bg-[#4fd1a5]/5 border-l-2 border-[#4fd1a5] rounded-r text-[11px] text-gray-300">
-                                        <Check className="w-3 h-3 text-[#4fd1a5]" /> {CALCULATOR_FEATURES[fid]?.name}
-                                    </div>
-                                ))
+                                <>
+                                    {CALCULATOR_PLANS[calcPlanId].included.map(fid => (
+                                        <div key={fid} className="flex items-center gap-2 p-1.5 bg-[#4fd1a5]/5 border-l-2 border-[#4fd1a5] rounded-r text-[11px] text-gray-300">
+                                            <Check className="w-3 h-3 text-[#4fd1a5]" /> {CALCULATOR_FEATURES[fid]?.name}
+                                        </div>
+                                    ))}
+                                    {calcPlanId === 'business' && (
+                                        <div className="flex items-center gap-2 p-1.5 bg-[#4fd1a5]/5 border-l-2 border-[#4fd1a5] rounded-r text-[11px] text-gray-300">
+                                            <Check className="w-3 h-3 text-[#4fd1a5]" /> .in Domain
+                                        </div>
+                                    )}
+                                    {calcPlanId === 'premium' && (
+                                        <div className="flex items-center gap-2 p-1.5 bg-[#4fd1a5]/5 border-l-2 border-[#4fd1a5] rounded-r text-[11px] text-gray-300">
+                                            <Check className="w-3 h-3 text-[#4fd1a5]" /> 1 Free Domain
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
 
@@ -332,6 +364,21 @@ export default function CalculatorPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                             {CALCULATOR_DOMAINS.map(domain => {
                                 const isSelected = calcDomains.has(domain.id);
+                                let isFree = false;
+
+                                if (calcPlanId === 'business' && domain.id === 'in') {
+                                    isFree = true;
+                                } else if (calcPlanId === 'premium') {
+                                    if (isSelected) {
+                                         const selectedDomains = Array.from(calcDomains).map(id => CALCULATOR_DOMAINS.find(d => d.id === id)).filter(d => d !== undefined) as typeof CALCULATOR_DOMAINS;
+                                         const maxPrice = Math.max(...selectedDomains.map(d => d.price));
+                                         const freeDomain = selectedDomains.find(d => d.price === maxPrice);
+                                         if (freeDomain?.id === domain.id) {
+                                             isFree = true;
+                                         }
+                                    }
+                                }
+
                                 return (
                                     <div
                                         key={domain.id}
@@ -344,7 +391,7 @@ export default function CalculatorPage() {
                                                 {isSelected && <Check className="w-2.5 h-2.5 text-black font-bold" />}
                                             </div>
                                         </div>
-                                        <span className="text-[#4fd1a5] text-[10px] font-bold">+ ₹{domain.price}</span>
+                                        <span className="text-[#4fd1a5] text-[10px] font-bold">{isFree ? 'Free' : `+ ₹${domain.price}`}</span>
                                     </div>
                                 );
                             })}
