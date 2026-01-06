@@ -407,6 +407,7 @@ export default function ClientPage() {
                                     <Upload className="w-3 h-3 animate-spin" /> Saving...
                                 </span>
                             )}
+                            <span className="ml-2 text-[9px] font-mono text-slate-300">v3.1</span>
                         </h1>
                         <p className="text-xs text-slate-500 flex flex-wrap items-center gap-2 mt-1">
                             <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" /> {client.contact_name || 'No Contact'}</span>
@@ -722,6 +723,9 @@ export default function ClientPage() {
                                         }
                                     }
 
+                                    // Debugging log
+                                    // console.log(`Rendering domain ${d.id}: Selected=${isSelected}, Package=${client.selected_package}, isFree=${isFree}`);
+
                                     return (
                                         <div key={d.id}
                                             onClick={() => {
@@ -735,7 +739,13 @@ export default function ClientPage() {
                                             className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer border transition-all ${isSelected ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
                                         >
                                             <span>{d.name}</span>
-                                            <span className="text-xs font-bold">{isFree ? 'Free (Included)' : `+₹${d.price}`}</span>
+                                            <span className="text-xs font-bold">
+                                                {/* Force inline check as backup */}
+                                                {(client.selected_package === 'business' && d.id === 'in') || isFree ?
+                                                    'Free (Included)' :
+                                                    `+₹${d.price}`
+                                                }
+                                            </span>
                                         </div>
                                     );
                                 })}
