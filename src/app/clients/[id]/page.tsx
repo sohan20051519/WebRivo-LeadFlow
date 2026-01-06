@@ -163,13 +163,19 @@ export default function ClientPage() {
         if (total !== client.package_price || total !== client.total_deal_value) {
             setClient(prev => {
                 if (!prev) return null;
-                const newState: Client = { ...prev, package_price: total, total_deal_value: total };
-                if (newState.payment_status === 'paid' && total > (newState.amount_paid || 0)) {
-                    newState.payment_status = 'partial';
-                } else if (total <= (newState.amount_paid || 0) && newState.payment_status === 'partial') {
-                    newState.payment_status = 'paid';
+                const paid = prev.amount_paid || 0;
+
+                // Strict status logic
+                let newStatus = prev.payment_status;
+                if (paid >= total && total > 0) {
+                    newStatus = 'paid';
+                } else if (paid > 0 && paid < total) {
+                    newStatus = 'partial';
+                } else {
+                    newStatus = 'unpaid'; // Or whatever default is (could be mapped to 'onboarding' status logic, but usually payment_status is distinct)
                 }
-                return newState;
+
+                return { ...prev, package_price: total, total_deal_value: total, payment_status: newStatus };
             });
         }
 
@@ -421,7 +427,29 @@ export default function ClientPage() {
                                     <label className="block text-xs font-bold text-slate-700 mb-1.5">Selected Package</label>
                                     <select
                                         value={client.selected_package}
-                                        onChange={(e) => handleChange('selected_package', e.target.value)}
+                                        onChange={(e) => {
+                                            const newPlan = e.target.value;
+                                            // Handle state update manually to include side-effects
+                                            setClient(prev => {
+                                                if (!prev) return null;
+                                                const updates: Partial<Client> = { selected_package: newPlan };
+
+                                                // Auto-select domains logic
+                                                const currentDomains = prev.domains || [];
+                                                if (newPlan === 'business') {
+                                                    // Ensure .in is selected
+                                                    if (!currentDomains.includes('in')) {
+                                                        updates.domains = [...currentDomains, 'in'];
+                                                    }
+                                                } else if (newPlan === 'premium') {
+                                                    // Ensure at least one is selected (default to com if empty)
+                                                    if (currentDomains.length === 0) {
+                                                        updates.domains = ['com'];
+                                                    }
+                                                }
+                                                return { ...prev, ...updates };
+                                            });
+                                        }}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm text-slate-700 outline-none focus:border-indigo-500 transition-colors"
                                     >
                                         {PACKAGES.map(p => <option key={p.id} value={p.id}>{p.name} - ₹{p.price}</option>)}
