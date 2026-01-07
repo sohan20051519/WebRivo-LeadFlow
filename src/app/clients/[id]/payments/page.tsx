@@ -304,12 +304,29 @@ export default function ClientPaymentsPage() {
 
             selectedDomains.forEach(d => {
                 let price = d.price;
-                if (d.id === freeDomainId && (c.selected_package === 'business' ? d.id === 'in' : true)) {
-                     // Extra check: For business, only 'in' is free. For premium, the chosen one is free.
-                     // My logic above sets freeDomainId='in' for business.
-                     // But wait, if they selected '.com' and '.in' in Business, only '.in' is free.
-                     // If they didn't select '.in', freeDomainId is still 'in' but it won't match any d.id unless 'in' is selected.
-                     price = 0;
+                let isFree = false;
+
+                if (c.selected_package === 'business') {
+                    if (d.id === 'in') isFree = true;
+                } else if (c.selected_package === 'premium') {
+                     // For premium, only allow specific TLDs to be free
+                     const ALLOWED_FREE = ['com', 'in', 'org', 'xyz'];
+                     // Filter selected domains to only those in the allowed list
+                     const allowedSelected = selectedDomains.filter(sd => ALLOWED_FREE.includes(sd.id));
+
+                     if (allowedSelected.length > 0) {
+                         const maxPrice = Math.max(...allowedSelected.map(asd => asd.price));
+                         // Use findLast or find to pick one. The previous logic picked the first one with maxPrice.
+                         const freeOne = allowedSelected.find(asd => asd.price === maxPrice);
+
+                         if (freeOne && freeOne.id === d.id) {
+                             isFree = true;
+                         }
+                     }
+                }
+
+                if (isFree) {
+                    price = 0;
                 }
                 items.push({ name: d.name, type: 'domain', price });
             });
@@ -541,36 +558,102 @@ export default function ClientPaymentsPage() {
                         </div>
 
                         {/* Quick Main Link Input */}
-                        <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center flex-1 max-w-md mx-6">
-                            <div className="pl-3 pr-2 text-slate-400">
-                                <LinkIcon className="w-4 h-4" />
+                        <div className="flex flex-col gap-2 flex-1 max-w-md mx-6">
+                            <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center">
+                                <div className="pl-3 pr-2 text-slate-400">
+                                    <LinkIcon className="w-4 h-4" />
+                                </div>
+                                <input
+                                    className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400"
+                                    placeholder="Paste Main Payment Link here..."
+                                    value={client.manual_payment_link || ''}
+                                    onChange={(e) => setClient({ ...client, manual_payment_link: e.target.value })}
+                                    onBlur={() => updateClient(client.id, { manual_payment_link: client.manual_payment_link })}
+                                />
+                                {client.manual_payment_link && (
+                                    <button
+                                        onClick={() => { navigator.clipboard.writeText(client.manual_payment_link || ''); showFeedback('Copied!', 'success'); }}
+                                        className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
+                                        title="Copy Link"
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </button>
+                                )}
                             </div>
-                            <input
-                                className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400"
-                                placeholder="Paste Main Payment Link here..."
-                                value={client.manual_payment_link || ''}
-                                onChange={(e) => setClient({ ...client, manual_payment_link: e.target.value })}
-                                onBlur={() => updateClient(client.id, { manual_payment_link: client.manual_payment_link })}
-                            />
-                            {client.manual_payment_link && (
-                                <button
-                                    onClick={() => { navigator.clipboard.writeText(client.manual_payment_link || ''); showFeedback('Copied!', 'success'); }}
-                                    className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
-                                    title="Copy Link"
-                                >
-                                    <Copy className="w-3 h-3" />
-                                </button>
-                            )}
+                            {/* Advance Payment Link Input */}
+                            <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center">
+                                <div className="pl-3 pr-2 text-slate-400">
+                                    <LinkIcon className="w-4 h-4" />
+                                </div>
+                                <input
+                                    className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400"
+                                    placeholder="Paste Advance Payment Link..."
+                                    value={client.advance_payment_link || ''}
+                                    onChange={(e) => setClient({ ...client, advance_payment_link: e.target.value })}
+                                    onBlur={() => updateClient(client.id, { advance_payment_link: client.advance_payment_link })}
+                                />
+                                {client.advance_payment_link && (
+                                    <button
+                                        onClick={() => { navigator.clipboard.writeText(client.advance_payment_link || ''); showFeedback('Copied!', 'success'); }}
+                                        className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
+                                        title="Copy Link"
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleWhatsAppReminder}
-                                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shadow-green-200 text-sm"
-                            >
-                                <MessageCircle className="w-4 h-4" />
-                                Send Breakdown
-                            </button>
+                        <div className="flex flex-col gap-2">
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleWhatsAppReminder}
+                                    className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm shadow-green-200 text-sm"
+                                >
+                                    <MessageCircle className="w-4 h-4" />
+                                    Full Breakdown
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (!client) return;
+
+                                        const advanceLink = client.advance_payment_link || '';
+                                        const advanceAmount = Math.round((client.total_deal_value || 0) * 0.5);
+
+                                        let text = `*PROJECT BOOKING / ADVANCE*\n`;
+                                        text += `For: *${client.business_name}* (${client.contact_name})\n`;
+                                        text += `--------------------------------\n`;
+
+                                        billOfMaterials.forEach(item => {
+                                            text += `• ${item.name}: ₹${item.price}\n`;
+                                        });
+
+                                        text += `--------------------------------\n`;
+                                        text += `*TOTAL ESTIMATE: ₹${client.total_deal_value}*\n\n`;
+
+                                        text += `To initiate the project, an advance payment of 50% is required.\n`;
+                                        text += `👉 *Advance Amount: ₹${advanceAmount.toLocaleString()}*\n\n`;
+
+                                        if (advanceLink) {
+                                            text += `🔹 *Advance Payment Link*: ${advanceLink}\n\n`;
+                                        } else if (client.manual_payment_link) {
+                                            text += `🔹 *Payment Link*: ${client.manual_payment_link}\n\n`;
+                                        }
+
+                                        text += `Please share the payment screenshot once done so we can get started immediately! 🚀\n`;
+
+                                        const phone = client.phone?.replace(/[^\d]/g, '');
+                                        const formattedPhone = phone?.length === 10 ? `91${phone}` : phone;
+
+                                        const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+                                        window.open(url, '_blank');
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm shadow-emerald-200 text-sm"
+                                >
+                                    <MessageCircle className="w-4 h-4" />
+                                    Advance Breakdown
+                                </button>
+                            </div>
                             <button
                                 onClick={() => handleOpenPaymentModal()}
                                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200 text-sm"
