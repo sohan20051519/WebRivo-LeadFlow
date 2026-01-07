@@ -52,6 +52,7 @@ const PLAN_INCLUDES: Record<string, string[]> = {
     custom: []
 };
 
+const DEFAULT_ADVANCE_LINK = "https://payments.cashfree.com/forms/webrivo";
 
 const PaymentModal = ({
     isOpen,
@@ -243,9 +244,13 @@ export default function ClientPaymentsPage() {
     const loadData = async () => {
         if (!id) return;
         const clientData = await getClient(id as string);
-        setClient(clientData);
 
         if (clientData) {
+            // Pre-fill default advance link if missing
+            if (!clientData.advance_payment_link) {
+                clientData.advance_payment_link = DEFAULT_ADVANCE_LINK;
+            }
+            setClient(clientData);
             const records = await fetchPaymentRecords(clientData.id);
             setPayments(records);
             calculateBreakdown(clientData);
@@ -620,8 +625,6 @@ export default function ClientPaymentsPage() {
                                     onClick={() => {
                                         if (!client) return;
 
-                                        // Default link if none is set
-                                        const DEFAULT_ADVANCE_LINK = "https://payments.cashfree.com/forms/webrivo";
                                         const advanceLink = client.advance_payment_link || DEFAULT_ADVANCE_LINK;
                                         const advanceAmount = Math.round((client.total_deal_value || 0) * 0.5);
 
