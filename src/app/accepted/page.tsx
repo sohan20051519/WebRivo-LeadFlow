@@ -136,7 +136,7 @@ function ClientStatusCell({ dsId, rowIdx }: { dsId: string, rowIdx: number }) {
 }
 
 export default function AcceptedPage() {
-    const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm, clients } = useLeadFlow();
+    const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm, clients, currentUser } = useLeadFlow();
     const [editingCell, setEditingCell] = useState<{ dsId: string, rowIndex: number, column: string, value: string } | null>(null);
     const [copiedText, setCopiedText] = useState<string | null>(null);
 
@@ -148,12 +148,12 @@ export default function AcceptedPage() {
             ds.data.forEach((r, i) => {
                 if (ds.statuses[i] === LeadStatus.ACCEPTED) {
                     if (!term) {
-                        rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name });
+                        rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name, assignedTo: ds.assignedTo });
                     } else {
                         // Safe robust search
                         const values = Object.values(r).map(v => String(v || '').toLowerCase()).join(' ');
                         if (values.includes(term)) {
-                            rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name });
+                            rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name, assignedTo: ds.assignedTo });
                         }
                     }
                 }
@@ -197,6 +197,11 @@ export default function AcceptedPage() {
                             <th className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[120px]">
                                 Payment
                             </th>
+                            {currentUser === 'admin' && (
+                                <th className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[100px]">
+                                    Assigned To
+                                </th>
+                            )}
                             {headers.map((h, i) => (
                                 <th key={i} className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[120px] md:min-w-[150px]">{h}</th>
                             ))}
@@ -218,6 +223,17 @@ export default function AcceptedPage() {
                                         <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-center">
                                             <PaymentStatusCell dsId={item.dsId} rowIdx={item.idx} />
                                         </td>
+                                        {currentUser === 'admin' && (
+                                            <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-center">
+                                                {item.assignedTo ? (
+                                                    <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-wider">
+                                                        {item.assignedTo}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-300 text-[10px] italic">-</span>
+                                                )}
+                                            </td>
+                                        )}
                                         {headers.map((h, i) => {
                                             const cellValue = item.row[h] || '';
                                             const isEditable = h === 'Phone Number' || h === 'Contact Person' || h === 'phone' || h === 'mobile' || h === 'Name';

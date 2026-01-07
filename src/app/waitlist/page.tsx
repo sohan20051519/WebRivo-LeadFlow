@@ -6,7 +6,7 @@ import { useState, useMemo } from 'react';
 import { CheckCircle, PauseCircle, XCircle, Copy, Check, Edit2, Filter } from 'lucide-react';
 
 export default function WaitlistPage() {
-    const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm } = useLeadFlow();
+    const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm, currentUser } = useLeadFlow();
     const [editingCell, setEditingCell] = useState<{ dsId: string, rowIndex: number, column: string, value: string } | null>(null);
     const [copiedText, setCopiedText] = useState<string | null>(null);
 
@@ -18,12 +18,12 @@ export default function WaitlistPage() {
             ds.data.forEach((r, i) => {
                 if (ds.statuses[i] === LeadStatus.WAIT) {
                     if (!term) {
-                        rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name });
+                        rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name, assignedTo: ds.assignedTo });
                     } else {
                         // Safe robust search
                         const values = Object.values(r).map(v => String(v || '').toLowerCase()).join(' ');
                         if (values.includes(term)) {
-                            rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name });
+                            rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name, assignedTo: ds.assignedTo });
                         }
                     }
                 }
@@ -62,6 +62,11 @@ export default function WaitlistPage() {
                             <th className="sticky left-0 bg-white/95 backdrop-blur-md px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-slate-100 w-auto md:w-56 shadow-[4px_0_12px_-4px_rgba(0,0,0,0.05)]">
                                 <span className="flex items-center gap-2"><PauseCircle className="w-3 h-3 text-amber-500" /> Waitlist Actions</span>
                             </th>
+                            {currentUser === 'admin' && (
+                                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[100px]">
+                                    Assigned To
+                                </th>
+                            )}
                             {headers.map((h, i) => (
                                 <th key={i} className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[150px]">{h}</th>
                             ))}
@@ -80,6 +85,17 @@ export default function WaitlistPage() {
                                                 <button onClick={() => updateLeadStatus(item.dsId, item.idx, LeadStatus.DECLINED)} className="p-1.5 rounded-lg text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition-all hover:scale-105" title="Decline"><XCircle className="w-4 h-4 md:w-5 md:h-5" /></button>
                                             </div>
                                         </td>
+                                        {currentUser === 'admin' && (
+                                            <td className="px-6 py-3 whitespace-nowrap">
+                                                {item.assignedTo ? (
+                                                    <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-wider">
+                                                        {item.assignedTo}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-300 text-[10px] italic">-</span>
+                                                )}
+                                            </td>
+                                        )}
                                         {headers.map((h, i) => {
                                             const cellValue = item.row[h] || '';
                                             const isEditable = h === 'Phone Number' || h === 'Contact Person' || h === 'phone' || h === 'mobile' || h === 'Name';
