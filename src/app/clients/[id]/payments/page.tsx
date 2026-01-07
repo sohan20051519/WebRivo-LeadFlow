@@ -464,6 +464,40 @@ export default function ClientPaymentsPage() {
         window.open(url, '_blank');
     };
 
+    const handleAdvanceWhatsAppReminder = () => {
+        if (!client) return;
+
+        // Default advance link if not set
+        const advanceLink = client.advance_payment_link || 'https://payments.cashfree.com/forms/webrivo';
+        const total = client.total_deal_value || 0;
+        const bookingAmount = Math.ceil(total * 0.5);
+        const remaining = total - bookingAmount;
+
+        // Construct Advance Payment Message
+        let text = `*WEB DESIGN PROJECT - BOOKING CONFIRMATION*\n`;
+        text += `For: *${client.business_name}* (${client.contact_name})\n`;
+        text += `--------------------------------\n`;
+
+        billOfMaterials.forEach(item => {
+            text += `• ${item.name}: ₹${item.price}\n`;
+        });
+
+        text += `--------------------------------\n`;
+        text += `*TOTAL PROJECT VALUE: ₹${total}*\n`;
+        text += `\nTo start the work, we require a 50% advance payment.\n`;
+        text += `✅ *BOOKING AMOUNT (50%): ₹${bookingAmount}*\n`;
+        text += `⏳ Remaining Balance (on completion): ₹${remaining}\n\n`;
+
+        text += `*Secure Payment Link*: ${advanceLink}\n\n`;
+        text += `Please share the payment screenshot once done so we can initiate the project immediately. 🚀`;
+
+        const phone = client.phone?.replace(/[^\d]/g, '');
+        const formattedPhone = phone?.length === 10 ? `91${phone}` : phone;
+
+        const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+        window.open(url, '_blank');
+    };
+
     // --- Drag & Drop ---
     const [isDragging, setIsDragging] = useState(false);
     const dragCounter = useRef(0);
@@ -541,39 +575,71 @@ export default function ClientPaymentsPage() {
                         </div>
 
                         {/* Quick Main Link Input */}
-                        <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center flex-1 max-w-md mx-6">
-                            <div className="pl-3 pr-2 text-slate-400">
-                                <LinkIcon className="w-4 h-4" />
+                        <div className="flex flex-col gap-2 flex-1 max-w-md mx-6">
+                            <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center">
+                                <div className="pl-3 pr-2 text-slate-400">
+                                    <LinkIcon className="w-4 h-4" />
+                                </div>
+                                <input
+                                    className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400"
+                                    placeholder="Paste Main Payment Link here..."
+                                    value={client.manual_payment_link || ''}
+                                    onChange={(e) => setClient({ ...client, manual_payment_link: e.target.value })}
+                                    onBlur={() => updateClient(client.id, { manual_payment_link: client.manual_payment_link })}
+                                />
+                                {client.manual_payment_link && (
+                                    <button
+                                        onClick={() => { navigator.clipboard.writeText(client.manual_payment_link || ''); showFeedback('Copied!', 'success'); }}
+                                        className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
+                                        title="Copy Link"
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </button>
+                                )}
                             </div>
-                            <input
-                                className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400"
-                                placeholder="Paste Main Payment Link here..."
-                                value={client.manual_payment_link || ''}
-                                onChange={(e) => setClient({ ...client, manual_payment_link: e.target.value })}
-                                onBlur={() => updateClient(client.id, { manual_payment_link: client.manual_payment_link })}
-                            />
-                            {client.manual_payment_link && (
-                                <button
-                                    onClick={() => { navigator.clipboard.writeText(client.manual_payment_link || ''); showFeedback('Copied!', 'success'); }}
-                                    className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
-                                    title="Copy Link"
-                                >
-                                    <Copy className="w-3 h-3" />
-                                </button>
-                            )}
+                            <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center">
+                                <div className="pl-3 pr-2 text-slate-400">
+                                    <LinkIcon className="w-4 h-4" />
+                                </div>
+                                <input
+                                    className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400"
+                                    placeholder="Advance Payment Link (Defaults to Cashfree)"
+                                    value={client.advance_payment_link || ''}
+                                    onChange={(e) => setClient({ ...client, advance_payment_link: e.target.value })}
+                                    onBlur={() => updateClient(client.id, { advance_payment_link: client.advance_payment_link })}
+                                />
+                                {client.advance_payment_link && (
+                                    <button
+                                        onClick={() => { navigator.clipboard.writeText(client.advance_payment_link || ''); showFeedback('Copied!', 'success'); }}
+                                        className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
+                                        title="Copy Link"
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleWhatsAppReminder}
-                                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shadow-green-200 text-sm"
-                            >
-                                <MessageCircle className="w-4 h-4" />
-                                Send Breakdown
-                            </button>
+                        <div className="flex gap-2 items-start">
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={handleWhatsAppReminder}
+                                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shadow-green-200 text-sm w-full justify-center"
+                                >
+                                    <MessageCircle className="w-4 h-4" />
+                                    Send Breakdown
+                                </button>
+                                <button
+                                    onClick={handleAdvanceWhatsAppReminder}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shadow-emerald-200 text-sm w-full justify-center"
+                                >
+                                    <MessageCircle className="w-4 h-4" />
+                                    Send Advance Breakdown
+                                </button>
+                            </div>
                             <button
                                 onClick={() => handleOpenPaymentModal()}
-                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200 text-sm"
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200 text-sm h-full"
                             >
                                 <Plus className="w-4 h-4" />
                                 Record Payment
