@@ -590,7 +590,10 @@ export default function ClientPaymentsPage() {
                                     placeholder="Paste Advance Payment Link..."
                                     value={client.advance_payment_link || ''}
                                     onChange={(e) => setClient({ ...client, advance_payment_link: e.target.value })}
-                                    onBlur={() => updateClient(client.id, { advance_payment_link: client.advance_payment_link })}
+                                    onBlur={() => {
+                                        // Auto-save the updated value
+                                        updateClient(client.id, { advance_payment_link: client.advance_payment_link });
+                                    }}
                                 />
                                 {client.advance_payment_link && (
                                     <button
@@ -617,7 +620,9 @@ export default function ClientPaymentsPage() {
                                     onClick={() => {
                                         if (!client) return;
 
-                                        const advanceLink = client.advance_payment_link || '';
+                                        // Default link if none is set
+                                        const DEFAULT_ADVANCE_LINK = "https://payments.cashfree.com/forms/webrivo";
+                                        const advanceLink = client.advance_payment_link || DEFAULT_ADVANCE_LINK;
                                         const advanceAmount = Math.round((client.total_deal_value || 0) * 0.5);
 
                                         let text = `*PROJECT BOOKING / ADVANCE*\n`;
