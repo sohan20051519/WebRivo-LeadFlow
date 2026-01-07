@@ -5,9 +5,10 @@ import { LeadStatus } from '@/types';
 import { useState, useMemo } from 'react';
 import { CheckCircle, PauseCircle, XCircle, Copy, Check, Edit2, Filter, User, Loader2, CreditCard } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { USER_LABELS } from '@/constants';
 
 function ClientActions({ dsId, rowIdx, rowData }: { dsId: string, rowIdx: number, rowData: any }) {
-    const { getMockClientBySource, createClient } = useLeadFlow();
+    const { getMockClientBySource, createClient, datasets } = useLeadFlow();
     const router = useRouter();
     const [loadingProfile, setLoadingProfile] = useState(false);
     const [loadingPayment, setLoadingPayment] = useState(false);
@@ -28,6 +29,10 @@ function ClientActions({ dsId, rowIdx, rowData }: { dsId: string, rowIdx: number
                 const email = rowData['Email'] || rowData['email'] || '';
                 const phone = rowData['Phone Number'] || rowData['Phone'] || rowData['mobile'] || '';
 
+                // Lookup source dataset to get assignment
+                const sourceDs = datasets.find(d => d.id === dsId);
+                const assignedUser = sourceDs?.assignedUser || sourceDs?.assignedTo;
+
                 clientId = await createClient({
                     business_name: business,
                     contact_name: contact,
@@ -35,6 +40,7 @@ function ClientActions({ dsId, rowIdx, rowData }: { dsId: string, rowIdx: number
                     phone: phone,
                     source_dataset_id: dsId,
                     source_row_index: rowIdx,
+                    assigned_user: assignedUser, // Explicitly carry over ownership
                     status: 'onboarding',
                     selected_package: 'basic',
                     package_price: 0,
@@ -136,7 +142,7 @@ function ClientStatusCell({ dsId, rowIdx }: { dsId: string, rowIdx: number }) {
 }
 
 export default function AcceptedPage() {
-    const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm, clients } = useLeadFlow();
+    const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm, clients, currentUser } = useLeadFlow();
     const [editingCell, setEditingCell] = useState<{ dsId: string, rowIndex: number, column: string, value: string } | null>(null);
     const [copiedText, setCopiedText] = useState<string | null>(null);
 
@@ -147,13 +153,14 @@ export default function AcceptedPage() {
         datasets.forEach(ds => {
             ds.data.forEach((r, i) => {
                 if (ds.statuses[i] === LeadStatus.ACCEPTED) {
+                    const assignedUser = ds.assignedUser || ds.assignedTo;
                     if (!term) {
-                        rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name });
+                        rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name, assignedUser });
                     } else {
                         // Safe robust search
                         const values = Object.values(r).map(v => String(v || '').toLowerCase()).join(' ');
                         if (values.includes(term)) {
-                            rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name });
+                            rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name, assignedUser });
                         }
                     }
                 }
@@ -201,6 +208,9 @@ export default function AcceptedPage() {
                                 <th key={i} className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[120px] md:min-w-[150px]">{h}</th>
                             ))}
                             <th className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">Source Dataset</th>
+                            {currentUser === 'admin' && (
+                                <th className="px-4 py-3 md:px-6 md:py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">Owner</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -238,6 +248,11 @@ export default function AcceptedPage() {
                                             );
                                         })}
                                         <td className="px-4 py-3 md:px-6 md:py-4 text-xs font-bold text-indigo-500 whitespace-nowrap italic">{item.dsName}</td>
+                                        {currentUser === 'admin' && (
+                                            <td className="px-4 py-3 md:px-6 md:py-4 text-xs font-bold text-slate-500 whitespace-nowrap">
+                                                {item.assignedUser ? (USER_LABELS[item.assignedUser] || item.assignedUser) : '-'}
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })

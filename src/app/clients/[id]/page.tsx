@@ -4,7 +4,8 @@ import { useLeadFlow } from '@/context/LeadFlowContext';
 import { Client, LeadStatus } from '@/types';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Upload, Save, CheckCircle, ExternalLink, Github, Database, Globe, Briefcase, DollarSign, Layout, Server, Shield, Layers, Plus, Trash2, Check, XCircle, ArrowLeft, CreditCard, Send, Loader2, Bell, FileText, Smartphone, MessageCircle, MapPin, Search, Calendar, Monitor, LifeBuoy, Link as LinkIcon } from 'lucide-react';
+import { Upload, Save, CheckCircle, ExternalLink, Github, Database, Globe, Briefcase, DollarSign, Layout, Server, Shield, Layers, Plus, Trash2, Check, XCircle, ArrowLeft, CreditCard, Send, Loader2, Bell, FileText, Smartphone, MessageCircle, MapPin, Search, Calendar, Monitor, LifeBuoy, Link as LinkIcon, User } from 'lucide-react';
+import { USER_LABELS } from '@/constants';
 
 const PACKAGES = [
     { id: 'basic', name: 'Basic', price: 2999 },
@@ -60,7 +61,7 @@ export default function ClientPage() {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { getClient, updateClient, deleteClient, updateLeadStatus, showFeedback, uploadPaymentProof } = useLeadFlow();
+    const { getClient, updateClient, deleteClient, updateLeadStatus, showFeedback, uploadPaymentProof, currentUser } = useLeadFlow();
     const [client, setClient] = useState<Client | null>(null);
     const [loading, setLoading] = useState(true);
     const [autoSaving, setAutoSaving] = useState(false);
@@ -377,6 +378,14 @@ export default function ClientPage() {
                             {client.email}
                             <span className="text-slate-300 hidden md:inline">|</span>
                             {client.phone}
+                            {currentUser === 'admin' && client.assigned_user && (
+                                <>
+                                    <span className="text-slate-300 hidden md:inline">|</span>
+                                    <span className="flex items-center gap-1 text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider">
+                                        <User className="w-3 h-3" /> {USER_LABELS[client.assigned_user] || client.assigned_user}
+                                    </span>
+                                </>
+                            )}
                         </p>
                     </div>
                 </div>

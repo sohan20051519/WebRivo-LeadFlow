@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { LeadStatus } from '@/types';
+import { USER_LABELS } from '@/constants';
 
 export default function DatasetsPage() {
     const {
@@ -246,9 +247,9 @@ export default function DatasetsPage() {
                                             ) : (
                                                 <h3 className="font-bold text-slate-800 text-lg mb-1 truncate group-hover:text-indigo-600 transition-colors">
                                                     {ds.name}
-                                                    {currentUser === 'admin' && ds.assignedTo && (
+                                                    {currentUser === 'admin' && (ds.assignedUser || ds.assignedTo) && (
                                                         <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-700 font-bold uppercase tracking-wider align-middle">
-                                                            {ds.assignedTo}
+                                                            {USER_LABELS[ds.assignedUser || ds.assignedTo || ''] || ds.assignedUser || ds.assignedTo}
                                                         </span>
                                                     )}
                                                 </h3>

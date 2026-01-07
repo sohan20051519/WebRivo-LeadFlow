@@ -6,9 +6,10 @@ import { useLeadFlow } from '@/context/LeadFlowContext';
 import {
     ArrowLeft, Loader2, Plus, Upload, CheckCircle2, Copy,
     ExternalLink, RefreshCw, FileText, XCircle, Trash2,
-    MessageCircle, IndianRupee, Pencil, Receipt, Link as LinkIcon
+    MessageCircle, IndianRupee, Pencil, Receipt, Link as LinkIcon, User
 } from 'lucide-react';
 import { Client, PaymentRecord } from '@/types';
+import { USER_LABELS } from '@/constants';
 import { supabase } from '@/lib/supabase';
 
 const PACKAGES = [
@@ -226,7 +227,7 @@ interface BillItem {
 export default function ClientPaymentsPage() {
     const { id } = useParams();
     const router = useRouter();
-    const { getClient, fetchPaymentRecords, addPaymentRecord, uploadPaymentProof, showFeedback, updateClient } = useLeadFlow();
+    const { getClient, fetchPaymentRecords, addPaymentRecord, uploadPaymentProof, showFeedback, updateClient, currentUser } = useLeadFlow();
 
     const [client, setClient] = useState<Client | null>(null);
     const [payments, setPayments] = useState<PaymentRecord[]>([]);
@@ -536,7 +537,14 @@ export default function ClientPaymentsPage() {
                             </button>
                             <div>
                                 <h1 className="text-xl font-bold text-slate-800">Financial Overview</h1>
-                                <p className="text-slate-500 text-sm">{client.business_name}</p>
+                                <p className="text-slate-500 text-sm flex items-center gap-2">
+                                    {client.business_name}
+                                    {currentUser === 'admin' && client.assigned_user && (
+                                        <span className="flex items-center gap-1 text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider">
+                                            <User className="w-3 h-3" /> {USER_LABELS[client.assigned_user] || client.assigned_user}
+                                        </span>
+                                    )}
+                                </p>
                             </div>
                         </div>
 

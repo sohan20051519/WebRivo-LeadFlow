@@ -4,9 +4,10 @@ import { useLeadFlow } from '@/context/LeadFlowContext';
 import { LeadStatus } from '@/types';
 import { useState, useMemo } from 'react';
 import { CheckCircle, PauseCircle, XCircle, Copy, Check, Edit2, Filter } from 'lucide-react';
+import { USER_LABELS } from '@/constants';
 
 export default function WaitlistPage() {
-    const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm } = useLeadFlow();
+    const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm, currentUser } = useLeadFlow();
     const [editingCell, setEditingCell] = useState<{ dsId: string, rowIndex: number, column: string, value: string } | null>(null);
     const [copiedText, setCopiedText] = useState<string | null>(null);
 
@@ -17,13 +18,14 @@ export default function WaitlistPage() {
         datasets.forEach(ds => {
             ds.data.forEach((r, i) => {
                 if (ds.statuses[i] === LeadStatus.WAIT) {
+                    const assignedUser = ds.assignedUser || ds.assignedTo;
                     if (!term) {
-                        rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name });
+                        rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name, assignedUser });
                     } else {
                         // Safe robust search
                         const values = Object.values(r).map(v => String(v || '').toLowerCase()).join(' ');
                         if (values.includes(term)) {
-                            rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name });
+                            rows.push({ row: r, idx: i, dsId: ds.id, dsName: ds.name, assignedUser });
                         }
                     }
                 }
@@ -66,6 +68,9 @@ export default function WaitlistPage() {
                                 <th key={i} className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap min-w-[150px]">{h}</th>
                             ))}
                             <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap text-right">Source ID</th>
+                            {currentUser === 'admin' && (
+                                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap text-right">Owner</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100/60">
@@ -131,6 +136,13 @@ export default function WaitlistPage() {
                                         <td className="px-6 py-4 text-xs font-bold text-indigo-500 whitespace-nowrap italic text-right">
                                             <span className="bg-indigo-50 px-2 py-1 rounded-lg">{item.dsName}</span>
                                         </td>
+                                        {currentUser === 'admin' && (
+                                            <td className="px-6 py-4 text-xs font-bold text-slate-500 whitespace-nowrap italic text-right">
+                                                <span className="bg-slate-50 px-2 py-1 rounded-lg">
+                                                    {item.assignedUser ? (USER_LABELS[item.assignedUser] || item.assignedUser) : '-'}
+                                                </span>
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })

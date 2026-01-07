@@ -109,7 +109,8 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
                         headers: item.headers || [],
                         data: item.data || [],
                         statuses: item.statuses || {},
-                        assignedTo
+                        assignedTo,
+                        assignedUser: item.assigned_user || assignedTo // Fallback to parsed if DB col is null
                     };
                 });
                 setDatasets(formattedData);
@@ -224,6 +225,7 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
                 headers: combinedHeaders,
                 data: combinedData.slice(0, 5000),
                 statuses: {},
+                assigned_user: assignedTo // Explicit save
             };
 
             const { error } = await supabase.from('datasets').insert([payload]);
@@ -481,7 +483,7 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         if (!currentUser) return [];
         if (currentUser === 'admin') return datasets;
 
-        return datasets.filter(d => d.assignedTo === currentUser);
+        return datasets.filter(d => d.assignedUser === currentUser || d.assignedTo === currentUser);
     }, [datasets, currentUser]);
 
     // Filter clients for global access (Revenue, Client Details)
@@ -490,11 +492,16 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         if (currentUser === 'admin') return clients;
 
         return clients.filter(c => {
-            // If client is linked to a dataset, check that dataset's assignment
+            // First check explicit assignment
+            if (c.assigned_user) {
+                return c.assigned_user === currentUser;
+            }
+
+            // Fallback: If client is linked to a dataset, check that dataset's assignment
             if (c.source_dataset_id) {
                 const sourceDs = datasets.find(d => d.id === c.source_dataset_id);
                 // If the dataset exists and is assigned to the user, show the client
-                return sourceDs?.assignedTo === currentUser;
+                return sourceDs?.assignedUser === currentUser || sourceDs?.assignedTo === currentUser;
             }
             // If manual client (no source), hide from non-admin to be safe
             return false;
