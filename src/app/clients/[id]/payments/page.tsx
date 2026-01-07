@@ -349,19 +349,39 @@ export default function ClientPaymentsPage() {
         setIsTypeSelectionOpen(true);
     };
 
-    const handleSelectPaymentType = (type: 'advance' | 'full') => {
+    const handleSelectPaymentType = async (type: 'advance' | 'full') => {
         setIsTypeSelectionOpen(false);
-        // If 'full', deduct 100 as the user likely wants to pay the 'balance' if advance is considered separate
-        // But we only deduct if outstanding is greater than 100 to avoid negative
-        const amount = type === 'advance' ? 100 : (outstanding > 100 ? outstanding - 100 : outstanding);
 
-        // Open the modal with pre-filled data
-        setModalInitialData({
-            amount: amount,
-            file: null,
-            statusAction: (type === 'full' && outstanding <= amount) ? 'paid' : 'none'
-        });
-        setIsPyModalOpen(true);
+        if (type === 'advance') {
+            // Instant-Add for Advance
+            // Bypass modal, use defaults: 100 INR, "Advance Payment", no file.
+            setProcessingPayment(true);
+            try {
+                 await addPaymentRecord({
+                    client_id: client?.id || '',
+                    amount: 100,
+                    notes: 'Advance Payment',
+                    proof_url: '',
+                });
+                showFeedback('Advance Payment Recorded', 'success');
+                await loadData(); // Refresh to update "Amount Paid So Far"
+            } catch (error: any) {
+                console.error(error);
+                showFeedback(`Failed: ${error.message || 'Error'}`, 'error');
+            } finally {
+                setProcessingPayment(false);
+            }
+        } else {
+            // Full / Manual: Open Modal as before
+            const amount = (outstanding > 100 ? outstanding - 100 : outstanding);
+
+            setModalInitialData({
+                amount: amount,
+                file: null,
+                statusAction: (outstanding <= amount) ? 'paid' : 'none'
+            });
+            setIsPyModalOpen(true);
+        }
     };
 
     const handleOpenPaymentModal = (file: File | null = null, existingRecord: PaymentRecord | null = null) => {
@@ -732,12 +752,12 @@ export default function ClientPaymentsPage() {
                         <div className="flex flex-col md:flex-row gap-4 pt-2 border-t border-slate-50">
 
                             {/* Main Payment Link */}
-                            <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center flex-1 relative">
+                            <div className={`flex border rounded-lg p-1 items-center flex-1 relative ${isMainLinkLocked ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-200'}`}>
                                 <div className="pl-3 pr-2 text-slate-400">
                                     <LinkIcon className="w-4 h-4" />
                                 </div>
                                 <input
-                                    className={`bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400 ${isMainLinkLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                    className={`bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400 ${isMainLinkLocked ? 'cursor-not-allowed text-slate-500' : ''}`}
                                     placeholder="Paste Main Payment Link here..."
                                     value={displayedMainLink}
                                     readOnly={isMainLinkLocked}
@@ -753,8 +773,8 @@ export default function ClientPaymentsPage() {
                                     }}
                                 />
                                 {isMainLinkLocked && (
-                                    <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 mr-2">
-                                        Fixed
+                                    <span className="text-[10px] text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded border border-slate-300 mr-2 font-bold uppercase">
+                                        Locked
                                     </span>
                                 )}
                                 {displayedMainLink && (
