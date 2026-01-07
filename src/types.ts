@@ -19,6 +19,7 @@ export interface Dataset {
     data: LeadRow[];
     statuses: { [rowIndex: number]: LeadStatus };
     assignedTo?: string; // Derived from name prefix [user]
+    assignedUser?: string; // Explicit DB column
 }
 
 export interface GlobalStats {
@@ -37,6 +38,8 @@ export interface Client {
     contact_name: string;
     email: string;
     phone: string;
+
+    assigned_user?: string; // New explicit ownership
 
     source_dataset_id?: string;
     source_row_index?: number;
