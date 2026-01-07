@@ -356,6 +356,18 @@ export default function ClientPaymentsPage() {
             // Instant-Add for Advance
             // Bypass modal, use defaults: 100 INR, "Advance Payment", no file.
             setProcessingPayment(true);
+
+            // OPTIMISTIC UPDATE: Update state immediately so UI reflects it while DB processes
+            const tempRecord: PaymentRecord = {
+                id: 'temp-' + Date.now(),
+                client_id: client?.id || '',
+                amount: 100,
+                notes: 'Advance Payment',
+                proof_url: '',
+                created_at: new Date().toISOString()
+            };
+            setPayments(prev => [tempRecord, ...prev]);
+
             try {
                  await addPaymentRecord({
                     client_id: client?.id || '',
@@ -364,10 +376,13 @@ export default function ClientPaymentsPage() {
                     proof_url: '',
                 });
                 showFeedback('Advance Payment Recorded', 'success');
-                await loadData(); // Refresh to update "Amount Paid So Far"
+                // Reload to get real ID and confirm
+                await loadData();
             } catch (error: any) {
                 console.error(error);
                 showFeedback(`Failed: ${error.message || 'Error'}`, 'error');
+                // Revert optimistic update if failed
+                setPayments(prev => prev.filter(p => p.id !== tempRecord.id));
             } finally {
                 setProcessingPayment(false);
             }
