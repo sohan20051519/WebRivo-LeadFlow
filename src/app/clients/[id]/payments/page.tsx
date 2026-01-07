@@ -54,12 +54,14 @@ const PLAN_INCLUDES: Record<string, string[]> = {
     custom: []
 };
 
-const PLAN_ADVANCE_LINKS: Record<string, string> = {
+// Hardcoded Plan Links for Main Payment / Breakdown
+const PLAN_LINKS: Record<string, string> = {
     basic: 'https://payments.cashfree.com/forms/webrivo-basic',
     business: 'https://payments.cashfree.com/forms/webrivo-business',
     premium: 'https://payments.cashfree.com/forms/webrivo-premium',
 };
 
+// Default Advance Link
 const DEFAULT_ADVANCE_LINK = 'https://payments.cashfree.com/forms/webrivo';
 
 const PaymentModal = ({
@@ -303,7 +305,6 @@ export default function ClientPaymentsPage() {
             });
 
             // Logic to track which one is free for display purposes
-            // This is slightly complex because we need to know WHICH one is free to set price to 0 in the list
             let freeDomainId: string | null = null;
 
             if (c.selected_package === 'business') {
@@ -317,10 +318,6 @@ export default function ClientPaymentsPage() {
             selectedDomains.forEach(d => {
                 let price = d.price;
                 if (d.id === freeDomainId && (c.selected_package === 'business' ? d.id === 'in' : true)) {
-                     // Extra check: For business, only 'in' is free. For premium, the chosen one is free.
-                     // My logic above sets freeDomainId='in' for business.
-                     // But wait, if they selected '.com' and '.in' in Business, only '.in' is free.
-                     // If they didn't select '.in', freeDomainId is still 'in' but it won't match any d.id unless 'in' is selected.
                      price = 0;
                 }
                 items.push({ name: d.name, type: 'domain', price });
@@ -354,8 +351,9 @@ export default function ClientPaymentsPage() {
 
     const handleSelectPaymentType = (type: 'advance' | 'full') => {
         setIsTypeSelectionOpen(false);
-        const amount = type === 'advance' ? 100 : outstanding;
-        const notes = type === 'advance' ? 'Advance Payment' : '';
+        // If 'full', deduct 100 as the user likely wants to pay the 'balance' if advance is considered separate
+        // But we only deduct if outstanding is greater than 100 to avoid negative
+        const amount = type === 'advance' ? 100 : (outstanding > 100 ? outstanding - 100 : outstanding);
 
         // Open the modal with pre-filled data
         setModalInitialData({
@@ -391,18 +389,12 @@ export default function ClientPaymentsPage() {
         if (!client) return;
         setProcessingPayment(true);
         try {
-            // Start with either existing PDF url or empty string. 
-            // NOTE: We only default to existingProofUrl if it's NOT a link we just edited.
-            // But validation logic below handles priority cleanly.
             let proofUrl = data.existingProofUrl || '';
 
-            // Priority: File Upload > Link Input > Existing PDF
             if (data.file) {
                 const url = await uploadPaymentProof(data.file, client.id);
                 if (url) proofUrl = url;
             } else if (data.proofLink) {
-                // If user provided a link, this OVERRIDES any existing PDF logic 
-                // unless they uploaded a new file above
                 proofUrl = data.proofLink;
             }
 
@@ -454,7 +446,11 @@ export default function ClientPaymentsPage() {
     const handleWhatsAppReminder = () => {
         if (!client) return;
 
-        const mainLink = client.manual_payment_link || '';
+        // Use Hardcoded Plan Link if available, else manual
+        let mainLink = client.manual_payment_link || '';
+        if (PLAN_LINKS[client.selected_package]) {
+            mainLink = PLAN_LINKS[client.selected_package];
+        }
 
         // Construct Invoice-like Message
         let text = `*INVOICE SUMMARY*\n`;
@@ -467,7 +463,10 @@ export default function ClientPaymentsPage() {
 
         text += `--------------------------------\n`;
         text += `*TOTAL DEAL VALUE: ₹${client.total_deal_value}*\n`;
-        text += `✅ Amount Paid: ₹${safeTotalPaid}\n`;
+        text += `Less Advance: -₹100\n`;
+        text += `*NET PAYABLE: ₹${Math.max(0, (client.total_deal_value || 0) - 100)}*\n`;
+
+        text += `✅ Amount Paid So Far: ₹${safeTotalPaid}\n`;
         text += `🚨 *OUTSTANDING DUE: ₹${outstanding}*\n\n`;
 
         if (outstanding > 0) {
@@ -480,8 +479,6 @@ export default function ClientPaymentsPage() {
             text += `*Payment Link*: ${mainLink}\n`;
         }
 
-        // Include any specific addon links if they exist in the breakdown? 
-        // We'll just append any extra addon links stored in client profile
         if (client.addon_links && client.addon_links.length > 0 && outstanding > 0) {
             text += `\n*Specific Payment Links:*\n`;
             client.addon_links.forEach(l => {
@@ -499,12 +496,9 @@ export default function ClientPaymentsPage() {
     const handleAdvanceWhatsAppReminder = () => {
         if (!client) return;
 
-        // Determine correct link
+        // Advance link logic: Default to generic Webrivo unless custom one is provided.
+        // We do NOT use the plan-specific links here, as they are for the full package usually.
         let advanceLink = client.advance_payment_link || DEFAULT_ADVANCE_LINK;
-        // If plan specific, override just in case (though UI should handle it)
-        if (PLAN_ADVANCE_LINKS[client.selected_package]) {
-            advanceLink = PLAN_ADVANCE_LINKS[client.selected_package];
-        }
 
         let text = `*ADVANCE PAYMENT REQUEST*\n`;
         text += `For: *${client.business_name}* (${client.contact_name})\n`;
@@ -554,16 +548,21 @@ export default function ClientPaymentsPage() {
         }
     };
 
-    // Determine if Advance Link is editable
-    const isAdvanceLinkLocked = !!PLAN_ADVANCE_LINKS[client?.selected_package || ''];
-    const displayedAdvanceLink = isAdvanceLinkLocked
-        ? PLAN_ADVANCE_LINKS[client?.selected_package || '']
-        : (client?.advance_payment_link || DEFAULT_ADVANCE_LINK);
+    // Determine lock states
+    // Main Link is locked if a plan is selected (as per Plan Links)
+    const isMainLinkLocked = !!PLAN_LINKS[client?.selected_package || ''];
+    const displayedMainLink = isMainLinkLocked
+        ? PLAN_LINKS[client?.selected_package || '']
+        : (client?.manual_payment_link || '');
+
+    // Advance Link is NOT locked by Plan, but defaults to Generic.
+    // User can edit it if needed.
+    const displayedAdvanceLink = client?.advance_payment_link || DEFAULT_ADVANCE_LINK;
 
     if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading...</div>;
+
     if (!client) return <div className="min-h-screen flex items-center justify-center text-slate-400">Client not found</div>;
 
-    // Helper for cost breakdown visual status
     let runningTotal = 0;
 
     return (
@@ -681,20 +680,34 @@ export default function ClientPaymentsPage() {
                         <div className="flex flex-col md:flex-row gap-4 pt-2 border-t border-slate-50">
 
                             {/* Main Payment Link */}
-                            <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center flex-1">
+                            <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center flex-1 relative">
                                 <div className="pl-3 pr-2 text-slate-400">
                                     <LinkIcon className="w-4 h-4" />
                                 </div>
                                 <input
-                                    className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400"
+                                    className={`bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400 ${isMainLinkLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
                                     placeholder="Paste Main Payment Link here..."
-                                    value={client.manual_payment_link || ''}
-                                    onChange={(e) => setClient({ ...client, manual_payment_link: e.target.value })}
-                                    onBlur={() => updateClient(client.id, { manual_payment_link: client.manual_payment_link })}
+                                    value={displayedMainLink}
+                                    readOnly={isMainLinkLocked}
+                                    onChange={(e) => {
+                                        if (!isMainLinkLocked) {
+                                            setClient({ ...client, manual_payment_link: e.target.value })
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        if (!isMainLinkLocked) {
+                                            updateClient(client.id, { manual_payment_link: client.manual_payment_link })
+                                        }
+                                    }}
                                 />
-                                {client.manual_payment_link && (
+                                {isMainLinkLocked && (
+                                    <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 mr-2">
+                                        Fixed
+                                    </span>
+                                )}
+                                {displayedMainLink && (
                                     <button
-                                        onClick={() => { navigator.clipboard.writeText(client.manual_payment_link || ''); showFeedback('Copied!', 'success'); }}
+                                        onClick={() => { navigator.clipboard.writeText(displayedMainLink); showFeedback('Copied!', 'success'); }}
                                         className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
                                         title="Copy Link"
                                     >
@@ -709,26 +722,12 @@ export default function ClientPaymentsPage() {
                                     <CreditCard className="w-4 h-4" />
                                 </div>
                                 <input
-                                    className={`bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400 ${isAdvanceLinkLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                    placeholder="Advance Payment Link..."
+                                    className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400"
+                                    placeholder="Advance Payment Link (Defaults to Webrivo)"
                                     value={displayedAdvanceLink}
-                                    readOnly={isAdvanceLinkLocked}
-                                    onChange={(e) => {
-                                        if (!isAdvanceLinkLocked) {
-                                            setClient({ ...client, advance_payment_link: e.target.value });
-                                        }
-                                    }}
-                                    onBlur={() => {
-                                        if (!isAdvanceLinkLocked) {
-                                            updateClient(client.id, { advance_payment_link: client.advance_payment_link });
-                                        }
-                                    }}
+                                    onChange={(e) => setClient({ ...client, advance_payment_link: e.target.value })}
+                                    onBlur={() => updateClient(client.id, { advance_payment_link: client.advance_payment_link })}
                                 />
-                                {isAdvanceLinkLocked && (
-                                    <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 mr-2">
-                                        Fixed
-                                    </span>
-                                )}
                                 {displayedAdvanceLink && (
                                     <button
                                         onClick={() => { navigator.clipboard.writeText(displayedAdvanceLink); showFeedback('Copied!', 'success'); }}
