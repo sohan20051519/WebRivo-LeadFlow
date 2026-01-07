@@ -4,6 +4,7 @@ import { useLeadFlow } from '@/context/LeadFlowContext';
 import { LeadStatus } from '@/types';
 import { useState, useMemo } from 'react';
 import { CheckCircle, PauseCircle, XCircle, Copy, Check, Edit2, Filter } from 'lucide-react';
+import { getUserLabel } from '@/constants';
 
 export default function WaitlistPage() {
     const { datasets, updateLeadStatus, updateCell, showFeedback, searchTerm, currentUser } = useLeadFlow();
@@ -89,7 +90,7 @@ export default function WaitlistPage() {
                                             <td className="px-6 py-3 whitespace-nowrap">
                                                 {item.assignedTo ? (
                                                     <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-wider">
-                                                        {item.assignedTo}
+                                                        {getUserLabel(item.assignedTo)}
                                                     </span>
                                                 ) : (
                                                     <span className="text-slate-300 text-[10px] italic">-</span>

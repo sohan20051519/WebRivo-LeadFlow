@@ -5,6 +5,7 @@ import { LeadStatus } from '@/types';
 import { useState, useMemo } from 'react';
 import { CheckCircle, PauseCircle, XCircle, Copy, Check, Edit2, Filter, User, Loader2, CreditCard } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { getUserLabel } from '@/constants';
 
 function ClientActions({ dsId, rowIdx, rowData }: { dsId: string, rowIdx: number, rowData: any }) {
     const { getMockClientBySource, createClient } = useLeadFlow();
@@ -227,7 +228,7 @@ export default function AcceptedPage() {
                                             <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-center">
                                                 {item.assignedTo ? (
                                                     <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-wider">
-                                                        {item.assignedTo}
+                                                        {getUserLabel(item.assignedTo)}
                                                     </span>
                                                 ) : (
                                                     <span className="text-slate-300 text-[10px] italic">-</span>
