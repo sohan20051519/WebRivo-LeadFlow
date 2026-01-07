@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Dataset, LeadRow, LeadStatus, Client, ClientUpdatePayload, PaymentRecord } from '@/types';
 
@@ -93,14 +93,13 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
             if (data) {
                 const formattedData: Dataset[] = data.map((item: any) => {
                     let assignedTo = undefined;
-                    // Check for [user] prefix
-                    const match = item.name.match(/^\[(.*?)]\s+(.*)$/);
+                    // Check for [user] prefix, handling potential __preserved__ prefix
+                    // Remove __preserved__ to check for user assignment tag
+                    const cleanName = item.name.replace(/^__preserved__/, '');
+                    const match = cleanName.match(/^\[(.*?)]/);
+
                     if (match) {
                         assignedTo = match[1];
-                        // We keep the original name for DB consistency but we could strip it for display if needed.
-                        // For now, let's keep it as is, or strip it here?
-                        // If we strip it here, we need to be careful when renaming/deleting.
-                        // Let's keep the name as is but add the assignedTo field.
                     }
 
                     return {
@@ -477,34 +476,41 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const getVisibleDatasets = () => {
-        const baseFiltered = datasets.filter(d => !d.name.startsWith('__preserved__'));
+    // Filter datasets for global access (Dashboard, Accepted, Waitlist)
+    const exposedDatasets = useMemo(() => {
+        if (!currentUser) return [];
+        if (currentUser === 'admin') return datasets;
 
-        // If not logged in or admin, assume showing all (or wait for auth).
-        // If admin, show all.
-        if (!currentUser || currentUser === 'admin') {
-            return baseFiltered;
-        }
+        return datasets.filter(d => d.assignedTo === currentUser);
+    }, [datasets, currentUser]);
 
-        // Otherwise filter by assignedTo
-        return baseFiltered.filter(d => {
-            // Check if dataset is assigned to current user
-            // We use the parsed assignedTo field or check the name prefix directly as fallback
-            const assignedName = d.assignedTo || (d.name.match(/^\[(.*?)]/)?.[1]);
-            return assignedName === currentUser;
+    // Filter clients for global access (Revenue, Client Details)
+    const exposedClients = useMemo(() => {
+        if (!currentUser) return [];
+        if (currentUser === 'admin') return clients;
+
+        return clients.filter(c => {
+            // If client is linked to a dataset, check that dataset's assignment
+            if (c.source_dataset_id) {
+                const sourceDs = datasets.find(d => d.id === c.source_dataset_id);
+                // If the dataset exists and is assigned to the user, show the client
+                return sourceDs?.assignedTo === currentUser;
+            }
+            // If manual client (no source), hide from non-admin to be safe
+            return false;
         });
-    };
+    }, [clients, datasets, currentUser]);
 
     return (
         <LeadFlowContext.Provider
             value={{
-                datasets,
-                visibleDatasets: getVisibleDatasets(),
+                datasets: exposedDatasets,
+                visibleDatasets: exposedDatasets.filter(d => !d.name.startsWith('__preserved__')),
                 loading,
                 refreshDatasets: fetchDatasets,
                 currentUser,
 
-                clients,
+                clients: exposedClients,
                 refreshClients: fetchAllClients,
 
                 filesToUpload,
