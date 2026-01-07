@@ -774,21 +774,21 @@ export default function ClientPaymentsPage() {
                                     <CreditCard className="w-4 h-4" />
                                 </div>
                                 <input
-                                    className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400"
+                                    className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400 opacity-70 cursor-not-allowed"
                                     placeholder="Advance Payment Link (Defaults to Webrivo)"
-                                    value={displayedAdvanceLink}
-                                    onChange={(e) => setClient({ ...client, advance_payment_link: e.target.value })}
-                                    onBlur={() => updateClient(client.id, { advance_payment_link: client.advance_payment_link })}
+                                    value={DEFAULT_ADVANCE_LINK}
+                                    readOnly={true}
                                 />
-                                {displayedAdvanceLink && (
-                                    <button
-                                        onClick={() => { navigator.clipboard.writeText(displayedAdvanceLink); showFeedback('Copied!', 'success'); }}
-                                        className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
-                                        title="Copy Link"
-                                    >
-                                        <Copy className="w-3 h-3" />
-                                    </button>
-                                )}
+                                <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 mr-2">
+                                    Fixed
+                                </span>
+                                <button
+                                    onClick={() => { navigator.clipboard.writeText(DEFAULT_ADVANCE_LINK); showFeedback('Copied!', 'success'); }}
+                                    className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
+                                    title="Copy Link"
+                                >
+                                    <Copy className="w-3 h-3" />
+                                </button>
                             </div>
                         </div>
                     </div>
