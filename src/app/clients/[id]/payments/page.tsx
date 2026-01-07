@@ -6,7 +6,8 @@ import { useLeadFlow } from '@/context/LeadFlowContext';
 import {
     ArrowLeft, Loader2, Plus, Upload, CheckCircle2, Copy,
     ExternalLink, RefreshCw, FileText, XCircle, Trash2,
-    MessageCircle, IndianRupee, Pencil, Receipt, Link as LinkIcon, User
+    MessageCircle, IndianRupee, Pencil, Receipt, Link as LinkIcon, User,
+    CreditCard
 } from 'lucide-react';
 import { Client, PaymentRecord } from '@/types';
 import { USER_LABELS } from '@/constants';
@@ -53,6 +54,15 @@ const PLAN_INCLUDES: Record<string, string[]> = {
     custom: []
 };
 
+// Hardcoded Plan Links for Main Payment / Breakdown
+const PLAN_LINKS: Record<string, string> = {
+    basic: 'https://payments.cashfree.com/forms/webrivo-basic',
+    business: 'https://payments.cashfree.com/forms/webrivo-business',
+    premium: 'https://payments.cashfree.com/forms/webrivo-premium',
+};
+
+// Default Advance Link
+const DEFAULT_ADVANCE_LINK = 'https://payments.cashfree.com/forms/webrivo';
 
 const PaymentModal = ({
     isOpen,
@@ -103,7 +113,7 @@ const PaymentModal = ({
             <div className={`bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-bold text-lg text-slate-800">
-                        {isEditMode ? 'Edit Payment Record' : 'Record Manual Payment'}
+                        {isEditMode ? 'Edit Payment Record' : 'Record Payment'}
                     </h3>
                     <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
                         <XCircle className="w-5 h-5 text-slate-400" />
@@ -238,6 +248,9 @@ export default function ClientPaymentsPage() {
     const [modalInitialData, setModalInitialData] = useState<any>(null);
     const [processingPayment, setProcessingPayment] = useState(false);
 
+    // Type selection modal state
+    const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false);
+
     // Derived Breakdown
     const [billOfMaterials, setBillOfMaterials] = useState<BillItem[]>([]);
 
@@ -292,7 +305,6 @@ export default function ClientPaymentsPage() {
             });
 
             // Logic to track which one is free for display purposes
-            // This is slightly complex because we need to know WHICH one is free to set price to 0 in the list
             let freeDomainId: string | null = null;
 
             if (c.selected_package === 'business') {
@@ -306,10 +318,6 @@ export default function ClientPaymentsPage() {
             selectedDomains.forEach(d => {
                 let price = d.price;
                 if (d.id === freeDomainId && (c.selected_package === 'business' ? d.id === 'in' : true)) {
-                     // Extra check: For business, only 'in' is free. For premium, the chosen one is free.
-                     // My logic above sets freeDomainId='in' for business.
-                     // But wait, if they selected '.com' and '.in' in Business, only '.in' is free.
-                     // If they didn't select '.in', freeDomainId is still 'in' but it won't match any d.id unless 'in' is selected.
                      price = 0;
                 }
                 items.push({ name: d.name, type: 'domain', price });
@@ -336,6 +344,61 @@ export default function ClientPaymentsPage() {
 
     // --- Actions ---
 
+    // Triggered when clicking "Record Payment" button
+    const handleInitialRecordClick = () => {
+        setIsTypeSelectionOpen(true);
+    };
+
+    const handleSelectPaymentType = async (type: 'advance' | 'full') => {
+        setIsTypeSelectionOpen(false);
+
+        if (type === 'advance') {
+            // Instant-Add for Advance
+            // Bypass modal, use defaults: 100 INR, "Advance Payment", no file.
+            setProcessingPayment(true);
+
+            // OPTIMISTIC UPDATE: Update state immediately so UI reflects it while DB processes
+            const tempRecord: PaymentRecord = {
+                id: 'temp-' + Date.now(),
+                client_id: client?.id || '',
+                amount: 100,
+                notes: 'Advance Payment',
+                proof_url: '',
+                created_at: new Date().toISOString()
+            };
+            setPayments(prev => [tempRecord, ...prev]);
+
+            try {
+                 await addPaymentRecord({
+                    client_id: client?.id || '',
+                    amount: 100,
+                    notes: 'Advance Payment',
+                    proof_url: '',
+                });
+                showFeedback('Advance Payment Recorded', 'success');
+                // Reload to get real ID and confirm
+                await loadData();
+            } catch (error: any) {
+                console.error(error);
+                showFeedback(`Failed: ${error.message || 'Error'}`, 'error');
+                // Revert optimistic update if failed
+                setPayments(prev => prev.filter(p => p.id !== tempRecord.id));
+            } finally {
+                setProcessingPayment(false);
+            }
+        } else {
+            // Full / Manual: Open Modal as before
+            const amount = (outstanding > 100 ? outstanding - 100 : outstanding);
+
+            setModalInitialData({
+                amount: amount,
+                file: null,
+                statusAction: (outstanding <= amount) ? 'paid' : 'none'
+            });
+            setIsPyModalOpen(true);
+        }
+    };
+
     const handleOpenPaymentModal = (file: File | null = null, existingRecord: PaymentRecord | null = null) => {
         if (existingRecord) {
             // Edit Mode
@@ -345,33 +408,28 @@ export default function ClientPaymentsPage() {
                 proof_url: existingRecord.proof_url,
                 statusAction: client?.payment_status === 'paid' ? 'paid' : 'none'
             });
+            setIsPyModalOpen(true);
         } else {
-            // Create Mode
+            // Create Mode via Drag & Drop (defaults to full outstanding or just opens modal)
             setModalInitialData({
                 amount: file ? outstanding : 0,
                 file: file,
                 statusAction: outstanding <= 0 ? 'paid' : 'none'
             });
+            setIsPyModalOpen(true);
         }
-        setIsPyModalOpen(true);
     };
 
     const handlePaymentSubmit = async (data: any) => {
         if (!client) return;
         setProcessingPayment(true);
         try {
-            // Start with either existing PDF url or empty string. 
-            // NOTE: We only default to existingProofUrl if it's NOT a link we just edited.
-            // But validation logic below handles priority cleanly.
             let proofUrl = data.existingProofUrl || '';
 
-            // Priority: File Upload > Link Input > Existing PDF
             if (data.file) {
                 const url = await uploadPaymentProof(data.file, client.id);
                 if (url) proofUrl = url;
             } else if (data.proofLink) {
-                // If user provided a link, this OVERRIDES any existing PDF logic 
-                // unless they uploaded a new file above
                 proofUrl = data.proofLink;
             }
 
@@ -386,7 +444,7 @@ export default function ClientPaymentsPage() {
                 await addPaymentRecord({
                     client_id: client.id,
                     amount: data.amount,
-                    notes: data.file ? 'Proof via PDF Upload' : (data.proofLink ? 'Payment Link Entry' : 'Manual Entry'),
+                    notes: data.file ? 'Proof via PDF Upload' : (data.proofLink ? 'Payment Link Entry' : (data.amount === 100 ? 'Advance Payment' : 'Manual Entry')),
                     proof_url: proofUrl,
                 });
                 showFeedback('Payment Recorded Successfully', 'success');
@@ -423,7 +481,63 @@ export default function ClientPaymentsPage() {
     const handleWhatsAppReminder = () => {
         if (!client) return;
 
-        const mainLink = client.manual_payment_link || '';
+        // Use Hardcoded Plan Link if available, else manual
+        let mainLink = client.manual_payment_link || '';
+        if (PLAN_LINKS[client.selected_package]) {
+            mainLink = PLAN_LINKS[client.selected_package];
+        }
+
+        // Calculated Outstanding for Message (Total - 100 - (Paid - 100 paid to advance?))
+        // Simplification: We treat 'Net Payable' as (Total - 100).
+        // Outstanding is (Net Payable - (TotalPaid that is NOT advance)).
+        // Since we don't distinguish payment types easily, we assume the first 100 of any payment covers the advance.
+        // So Outstanding = (Total - 100) - Math.max(0, TotalPaid - 100).
+        // Which simplifies to: Total - 100 - TotalPaid + 100 (if Paid > 100) => Total - TotalPaid = System Outstanding.
+        // BUT if Paid=0, it is Total - 100.
+        // So OutstandingMessage = SystemOutstanding - 100 + Math.min(TotalPaid, 100).
+        // If Paid=0: O - 100.
+        // If Paid=100: O - 100 + 100 = O.
+
+        // Wait, simpler logic based on user request:
+        // User wants "OUTSTANDING DUE" to match "NET PAYABLE" (7899) when nothing is paid (7999 total).
+        // So they want to deduct 100 from the System Outstanding unless it's already accounted for?
+        // Let's use: (Total - 100) - (Paid).
+        // If Paid=0, Outstanding=7899.
+        // If Paid=100 (Advance), Outstanding=7799. This is wrong if the user still owes 7899.
+        // IF Paid=100, the user likely paid the advance. So they owe 7899.
+        // So if Paid=100, we want to show 7899.
+        // My formula (T-100-P) gives 7799.
+
+        // Let's assume the user logic is:
+        // Invoice is for BALANCE.
+        // Balance = Total - 100.
+        // Paid Balance = TotalPaid - 100 (assuming 100 covers advance).
+        // Outstanding Balance = Balance - Paid Balance.
+        // = (Total - 100) - (TotalPaid - 100)
+        // = Total - TotalPaid = System Outstanding.
+
+        // So mathematically, System Outstanding IS the correct Balance Outstanding IF paid > 100.
+        // BUT if Paid < 100 (e.g. 0), then Paid Balance is negative? No.
+        // If Paid=0. Balance=7900. Paid Balance=0. Outstanding=7900.
+        // Why does the user want 7900?
+        // Ah, the user complains: "even after deducting 100rs from advance still it is showing ... OUTSTANDING DUE: 7999" (Total).
+        // They want it to show 7899.
+        // So when Paid=0, they want Total-100.
+
+        // So:
+        // If Paid=0: Show Total - 100.
+        // If Paid=100: Show Total - 100. (Since 100 covers advance, 0 covers balance).
+        // If Paid=200: Show Total - 200. (100 advance, 100 balance).
+
+        // Formula: Total - 100 - Math.max(0, TotalPaid - 100).
+        // Paid=0: T - 100 - 0 = T-100. (Correct).
+        // Paid=100: T - 100 - 0 = T-100. (Correct).
+        // Paid=200: T - 100 - 100 = T-200. (Correct).
+
+        const netPayable = Math.max(0, (client.total_deal_value || 0) - 100);
+        // We consider 'paid against balance' as anything above 100.
+        const paidAgainstBalance = Math.max(0, safeTotalPaid - 100);
+        const outstandingBalance = Math.max(0, netPayable - paidAgainstBalance);
 
         // Construct Invoice-like Message
         let text = `*INVOICE SUMMARY*\n`;
@@ -431,15 +545,18 @@ export default function ClientPaymentsPage() {
         text += `--------------------------------\n`;
 
         billOfMaterials.forEach(item => {
-            text += `• ${item.name}: ₹${item.price}\n`;
+            text += `  ${item.name}: ₹${item.price}\n`;
         });
 
         text += `--------------------------------\n`;
         text += `*TOTAL DEAL VALUE: ₹${client.total_deal_value}*\n`;
-        text += `✅ Amount Paid: ₹${safeTotalPaid}\n`;
-        text += `🚨 *OUTSTANDING DUE: ₹${outstanding}*\n\n`;
+        text += `Less Advance: -₹100\n`;
+        text += `*NET PAYABLE: ₹${netPayable}*\n\n`;
 
-        if (outstanding > 0) {
+        text += `Amount Paid So Far: ₹${safeTotalPaid}\n`;
+        text += `*OUTSTANDING DUE: ₹${outstandingBalance}*\n\n`;
+
+        if (outstandingBalance > 0) {
             text += `Please clear the remaining balance to avoid service interruption.\n\n`;
         } else {
             text += `Thank you for your business! All dues are cleared.\n\n`;
@@ -449,8 +566,6 @@ export default function ClientPaymentsPage() {
             text += `*Payment Link*: ${mainLink}\n`;
         }
 
-        // Include any specific addon links if they exist in the breakdown? 
-        // We'll just append any extra addon links stored in client profile
         if (client.addon_links && client.addon_links.length > 0 && outstanding > 0) {
             text += `\n*Specific Payment Links:*\n`;
             client.addon_links.forEach(l => {
@@ -464,6 +579,30 @@ export default function ClientPaymentsPage() {
         const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
         window.open(url, '_blank');
     };
+
+    const handleAdvanceWhatsAppReminder = () => {
+        if (!client) return;
+
+        // Advance link logic: Default to generic Webrivo unless custom one is provided.
+        // We do NOT use the plan-specific links here, as they are for the full package usually.
+        let advanceLink = client.advance_payment_link || DEFAULT_ADVANCE_LINK;
+
+        let text = `*ADVANCE PAYMENT REQUEST*\n`;
+        text += `For: *${client.business_name}* (${client.contact_name})\n`;
+        text += `--------------------------------\n`;
+        text += `*TOTAL DEAL VALUE: ₹${client.total_deal_value}*\n`;
+        text += `--------------------------------\n`;
+        text += `Please pay the advance amount to confirm your order.\n\n`;
+        text += `*Advance Amount: ₹100*\n`;
+        text += `Note: This ₹100 will be deducted from your total deal value.\n\n`;
+        text += `*Payment Link*: ${advanceLink}\n`;
+
+        const phone = client.phone?.replace(/[^\d]/g, '');
+        const formattedPhone = phone?.length === 10 ? `91${phone}` : phone;
+
+        const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+        window.open(url, '_blank');
+    }
 
     // --- Drag & Drop ---
     const [isDragging, setIsDragging] = useState(false);
@@ -496,10 +635,21 @@ export default function ClientPaymentsPage() {
         }
     };
 
+    // Determine lock states
+    // Main Link is locked if a plan is selected (as per Plan Links)
+    const isMainLinkLocked = !!PLAN_LINKS[client?.selected_package || ''];
+    const displayedMainLink = isMainLinkLocked
+        ? PLAN_LINKS[client?.selected_package || '']
+        : (client?.manual_payment_link || '');
+
+    // Advance Link is NOT locked by Plan, but defaults to Generic.
+    // User can edit it if needed.
+    const displayedAdvanceLink = client?.advance_payment_link || DEFAULT_ADVANCE_LINK;
+
     if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading...</div>;
+
     if (!client) return <div className="min-h-screen flex items-center justify-center text-slate-400">Client not found</div>;
 
-    // Helper for cost breakdown visual status
     let runningTotal = 0;
 
     return (
@@ -519,6 +669,41 @@ export default function ClientPaymentsPage() {
                 </div>
             )}
 
+            {/* Payment Type Selection Modal */}
+            {isTypeSelectionOpen && (
+                <div className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-200">
+                        <h3 className="text-lg font-bold text-slate-800 mb-4 text-center">Select Payment Type</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <button
+                                onClick={() => handleSelectPaymentType('advance')}
+                                className="flex flex-col items-center justify-center p-4 bg-indigo-50 border border-indigo-100 rounded-xl hover:bg-indigo-100 transition-colors"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-indigo-200 text-indigo-700 flex items-center justify-center mb-2 font-bold">₹</div>
+                                <span className="font-bold text-indigo-700">Advance</span>
+                                <span className="text-xs text-indigo-400">₹100.00</span>
+                            </button>
+                            <button
+                                onClick={() => handleSelectPaymentType('full')}
+                                className="flex flex-col items-center justify-center p-4 bg-emerald-50 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-colors"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-emerald-200 text-emerald-700 flex items-center justify-center mb-2">
+                                    <Receipt className="w-5 h-5" />
+                                </div>
+                                <span className="font-bold text-emerald-700">Full / Manual</span>
+                                <span className="text-xs text-emerald-500">Other Amount</span>
+                            </button>
+                        </div>
+                        <button
+                            onClick={() => setIsTypeSelectionOpen(false)}
+                            className="mt-6 w-full py-3 text-slate-400 font-bold text-sm hover:text-slate-600"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <PaymentModal
                 isOpen={isPyModalOpen}
                 onClose={() => setIsPyModalOpen(false)}
@@ -530,62 +715,116 @@ export default function ClientPaymentsPage() {
             <main className="flex-1 overflow-y-auto w-full">
                 <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
                     {/* Header */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
-                                <ArrowLeft className="w-5 h-5" />
-                            </button>
-                            <div>
-                                <h1 className="text-xl font-bold text-slate-800">Financial Overview</h1>
-                                <p className="text-slate-500 text-sm flex items-center gap-2">
-                                    {client.business_name}
-                                    {currentUser === 'admin' && client.assigned_user && (
-                                        <span className="flex items-center gap-1 text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider">
-                                            <User className="w-3 h-3" /> {USER_LABELS[client.assigned_user] || client.assigned_user}
-                                        </span>
-                                    )}
-                                </p>
+                    <div className="flex flex-col gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+
+                        {/* Top Row: Back, Title, User */}
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
+                                    <ArrowLeft className="w-5 h-5" />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-bold text-slate-800">Financial Overview</h1>
+                                    <p className="text-slate-500 text-sm flex items-center gap-2">
+                                        {client.business_name}
+                                        {currentUser === 'admin' && client.assigned_user && (
+                                            <span className="flex items-center gap-1 text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider">
+                                                <User className="w-3 h-3" /> {USER_LABELS[client.assigned_user] || client.assigned_user}
+                                            </span>
+                                        )}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                                {/* Advance Breakdown Button */}
+                                <button
+                                    onClick={handleAdvanceWhatsAppReminder}
+                                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold rounded-lg transition-colors flex items-center gap-2 border border-indigo-200 text-xs"
+                                >
+                                    <MessageCircle className="w-3 h-3" />
+                                    Send Advance Breakdown
+                                </button>
+
+                                <button
+                                    onClick={handleWhatsAppReminder}
+                                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shadow-green-200 text-sm"
+                                >
+                                    <MessageCircle className="w-4 h-4" />
+                                    Send Breakdown
+                                </button>
+                                <button
+                                    onClick={() => handleInitialRecordClick()}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200 text-sm"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Record Payment
+                                </button>
                             </div>
                         </div>
 
-                        {/* Quick Main Link Input */}
-                        <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center flex-1 max-w-md mx-6">
-                            <div className="pl-3 pr-2 text-slate-400">
-                                <LinkIcon className="w-4 h-4" />
+                        {/* Links Row */}
+                        <div className="flex flex-col md:flex-row gap-4 pt-2 border-t border-slate-50">
+
+                            {/* Main Payment Link */}
+                            <div className={`flex border rounded-lg p-1 items-center flex-1 relative ${isMainLinkLocked ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-200'}`}>
+                                <div className="pl-3 pr-2 text-slate-400">
+                                    <LinkIcon className="w-4 h-4" />
+                                </div>
+                                <input
+                                    className={`bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400 ${isMainLinkLocked ? 'cursor-not-allowed text-slate-500' : ''}`}
+                                    placeholder="Paste Main Payment Link here..."
+                                    value={displayedMainLink}
+                                    readOnly={isMainLinkLocked}
+                                    onChange={(e) => {
+                                        if (!isMainLinkLocked) {
+                                            setClient({ ...client, manual_payment_link: e.target.value })
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        if (!isMainLinkLocked) {
+                                            updateClient(client.id, { manual_payment_link: client.manual_payment_link })
+                                        }
+                                    }}
+                                />
+                                {isMainLinkLocked && (
+                                    <span className="text-[10px] text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded border border-slate-300 mr-2 font-bold uppercase">
+                                        Locked
+                                    </span>
+                                )}
+                                {displayedMainLink && (
+                                    <button
+                                        onClick={() => { navigator.clipboard.writeText(displayedMainLink); showFeedback('Copied!', 'success'); }}
+                                        className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
+                                        title="Copy Link"
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </button>
+                                )}
                             </div>
-                            <input
-                                className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400"
-                                placeholder="Paste Main Payment Link here..."
-                                value={client.manual_payment_link || ''}
-                                onChange={(e) => setClient({ ...client, manual_payment_link: e.target.value })}
-                                onBlur={() => updateClient(client.id, { manual_payment_link: client.manual_payment_link })}
-                            />
-                            {client.manual_payment_link && (
+
+                            {/* Advance Payment Link */}
+                            <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center flex-1 relative">
+                                <div className="pl-3 pr-2 text-slate-400">
+                                    <CreditCard className="w-4 h-4" />
+                                </div>
+                                <input
+                                    className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400 opacity-70 cursor-not-allowed"
+                                    placeholder="Advance Payment Link (Defaults to Webrivo)"
+                                    value={DEFAULT_ADVANCE_LINK}
+                                    readOnly={true}
+                                />
+                                <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 mr-2">
+                                    Fixed
+                                </span>
                                 <button
-                                    onClick={() => { navigator.clipboard.writeText(client.manual_payment_link || ''); showFeedback('Copied!', 'success'); }}
+                                    onClick={() => { navigator.clipboard.writeText(DEFAULT_ADVANCE_LINK); showFeedback('Copied!', 'success'); }}
                                     className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
                                     title="Copy Link"
                                 >
                                     <Copy className="w-3 h-3" />
                                 </button>
-                            )}
-                        </div>
-
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleWhatsAppReminder}
-                                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shadow-green-200 text-sm"
-                            >
-                                <MessageCircle className="w-4 h-4" />
-                                Send Breakdown
-                            </button>
-                            <button
-                                onClick={() => handleOpenPaymentModal()}
-                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200 text-sm"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Record Payment
-                            </button>
+                            </div>
                         </div>
                     </div>
 
@@ -686,7 +925,7 @@ export default function ClientPaymentsPage() {
                                             Record manual payments or upload proof of payment to start tracking.
                                         </p>
                                         <button
-                                            onClick={() => handleOpenPaymentModal()}
+                                            onClick={() => handleInitialRecordClick()}
                                             className="px-4 py-2 bg-indigo-50 text-indigo-600 font-bold rounded-lg text-sm hover:bg-indigo-100 transition-colors"
                                         >
                                             Add First Payment
