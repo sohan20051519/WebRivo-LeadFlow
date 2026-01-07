@@ -11,8 +11,9 @@ SET assigned_user = substring(name from '^\[(.*?)\]')
 WHERE assigned_user IS NULL AND name ~ '^\[(.*?)\]';
 
 -- Backfill clients: Inherit from source dataset
+-- Fix: Cast d.id to text because c.source_dataset_id is text and d.id is uuid
 UPDATE clients c
 SET assigned_user = d.assigned_user
 FROM datasets d
-WHERE c.source_dataset_id = d.id
+WHERE c.source_dataset_id = d.id::text
 AND c.assigned_user IS NULL;
