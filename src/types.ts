@@ -72,6 +72,7 @@ export interface Client {
 
     // Manual Payment Links
     manual_payment_link?: string;
+    advance_payment_link?: string;
     payment_completed_link?: string;
 
     // Additional Payment Links
