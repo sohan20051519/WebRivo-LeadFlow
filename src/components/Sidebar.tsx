@@ -15,7 +15,8 @@ import {
     Phone,
     FileText,
     RefreshCw,
-    ShieldCheck
+    ShieldCheck,
+    Users
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -105,19 +106,21 @@ export default function Sidebar() {
                             </div>
                         )}
 
-                        <Link
-                            href="/legal"
-                            onClick={() => setMobileMenuOpen(false)}
-                            className={`flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${pathname.startsWith('/legal') || pathname === '/products' || pathname === '/contact'
-                                ? 'bg-indigo-50/80 text-indigo-600 shadow-sm ring-1 ring-indigo-100'
-                                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-                                }`}
-                        >
-                            <div className={`p-1.5 rounded-lg mr-3 transition-colors ${pathname.startsWith('/legal') ? 'bg-white shadow-sm' : 'bg-slate-100'}`}>
-                                <ShieldCheck className="w-4 h-4 text-slate-500" />
-                            </div>
-                            Legal & Support
-                        </Link>
+                        {currentUser === 'admin' && (
+                            <Link
+                                href="/users"
+                                onClick={() => setMobileMenuOpen(false)}
+                                className={`flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${pathname.startsWith('/users')
+                                    ? 'bg-indigo-50/80 text-indigo-600 shadow-sm ring-1 ring-indigo-100'
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                                    }`}
+                            >
+                                <div className={`p-1.5 rounded-lg mr-3 transition-colors ${pathname.startsWith('/users') ? 'bg-white shadow-sm' : 'bg-slate-100'}`}>
+                                <Users className="w-4 h-4 text-slate-500" />
+                                </div>
+                                User Management
+                            </Link>
+                        )}
                     </div>
                 </div>
             </aside>
