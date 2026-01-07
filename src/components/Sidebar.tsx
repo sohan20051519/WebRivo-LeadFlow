@@ -15,13 +15,15 @@ import {
     Phone,
     FileText,
     RefreshCw,
-    ShieldCheck
+    ShieldCheck,
+    Users
 } from 'lucide-react';
 
 export default function Sidebar() {
     const {
         mobileMenuOpen,
         setMobileMenuOpen,
+        currentUser
     } = useLeadFlow();
 
     const pathname = usePathname();
@@ -90,21 +92,35 @@ export default function Sidebar() {
 
                     </div>
 
-                    {/* Legal & Support Hub Link - Fixed at Bottom */}
-                    <div className="p-4 border-t border-slate-100">
-                        <Link
-                            href="/legal"
-                            onClick={() => setMobileMenuOpen(false)}
-                            className={`flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${pathname.startsWith('/legal') || pathname === '/products' || pathname === '/contact'
-                                ? 'bg-indigo-50/80 text-indigo-600 shadow-sm ring-1 ring-indigo-100'
-                                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-                                }`}
-                        >
-                            <div className={`p-1.5 rounded-lg mr-3 transition-colors ${pathname.startsWith('/legal') ? 'bg-white shadow-sm' : 'bg-slate-100'}`}>
-                                <ShieldCheck className="w-4 h-4 text-slate-500" />
+                    {/* User Profile & Legal - Fixed at Bottom */}
+                    <div className="p-4 border-t border-slate-100 space-y-2">
+                        {currentUser && (
+                            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-slate-50 border border-slate-100">
+                                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold uppercase text-xs">
+                                    {currentUser[0]}
+                                </div>
+                                <div className="flex flex-col overflow-hidden">
+                                    <span className="text-sm font-bold text-slate-700 capitalize truncate">{currentUser}</span>
+                                    <span className="text-[10px] text-slate-400 truncate">Authorized User</span>
+                                </div>
                             </div>
-                            Legal & Support
-                        </Link>
+                        )}
+
+                        {currentUser === 'admin' && (
+                            <Link
+                                href="/users"
+                                onClick={() => setMobileMenuOpen(false)}
+                                className={`flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${pathname.startsWith('/users')
+                                    ? 'bg-indigo-50/80 text-indigo-600 shadow-sm ring-1 ring-indigo-100'
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                                    }`}
+                            >
+                                <div className={`p-1.5 rounded-lg mr-3 transition-colors ${pathname.startsWith('/users') ? 'bg-white shadow-sm' : 'bg-slate-100'}`}>
+                                <Users className="w-4 h-4 text-slate-500" />
+                                </div>
+                                User Management
+                            </Link>
+                        )}
                     </div>
                 </div>
             </aside>

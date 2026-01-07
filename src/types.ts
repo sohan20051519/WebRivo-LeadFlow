@@ -18,6 +18,7 @@ export interface Dataset {
     headers: string[];
     data: LeadRow[];
     statuses: { [rowIndex: number]: LeadStatus };
+    assignedTo?: string; // Derived from name prefix [user]
 }
 
 export interface GlobalStats {

@@ -4,6 +4,7 @@ import React, { useState, useEffect, ReactNode } from 'react';
 import { Lock, Loader2, AlertCircle, Clock } from 'lucide-react';
 
 const SESSION_KEY = 'leadflow_authenticated';
+const USER_KEY = 'leadflow_user';
 const ATTEMPTS_KEY = 'leadflow_attempts';
 const LOCKOUT_KEY = 'leadflow_lockout';
 const MAX_ATTEMPTS = 5;
@@ -91,6 +92,9 @@ export default function AuthGate({ children }: { children: ReactNode }) {
                 localStorage.removeItem(ATTEMPTS_KEY);
                 localStorage.removeItem(LOCKOUT_KEY);
                 sessionStorage.setItem(SESSION_KEY, 'true');
+                if (data.user) {
+                    sessionStorage.setItem(USER_KEY, data.user);
+                }
                 setIsAuthenticated(true);
             } else {
                 // Failed attempt

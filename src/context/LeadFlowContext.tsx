@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Dataset, LeadRow, LeadStatus, Client, ClientUpdatePayload, PaymentRecord } from '@/types';
 
@@ -25,7 +25,10 @@ interface LeadFlowContextType {
     removeFileFromUpload: (index: number) => void;
     clearUploadQueue: () => void;
     uploading: boolean;
-    processUploadQueue: () => Promise<void>;
+    processUploadQueue: (assignedTo?: string) => Promise<void>;
+
+    // User
+    currentUser: string | null;
 
     // Operations
     deleteDataset: (id: string) => Promise<boolean>;
@@ -62,11 +65,18 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
+    const [currentUser, setCurrentUser] = useState<string | null>(null);
 
     const showFeedback = (text: string, type: 'success' | 'info' | 'error' = 'info') => {
         setFeedback({ text, type });
         setTimeout(() => setFeedback(null), 3000);
     };
+
+    useEffect(() => {
+        // Load user from session storage
+        const user = sessionStorage.getItem('leadflow_user');
+        setCurrentUser(user);
+    }, []);
 
     // ... (existing fetch datasets)
 
@@ -81,14 +91,27 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
             if (error) throw new Error(error.message);
 
             if (data) {
-                const formattedData: Dataset[] = data.map((item: any) => ({
-                    id: item.id,
-                    name: item.name,
-                    createdAt: new Date(item.created_at),
-                    headers: item.headers || [],
-                    data: item.data || [],
-                    statuses: item.statuses || {}
-                }));
+                const formattedData: Dataset[] = data.map((item: any) => {
+                    let assignedTo = undefined;
+                    // Check for [user] prefix, handling potential __preserved__ prefix
+                    // Remove __preserved__ to check for user assignment tag
+                    const cleanName = item.name.replace(/^__preserved__/, '');
+                    const match = cleanName.match(/^\[(.*?)]/);
+
+                    if (match) {
+                        assignedTo = match[1];
+                    }
+
+                    return {
+                        id: item.id,
+                        name: item.name,
+                        createdAt: new Date(item.created_at),
+                        headers: item.headers || [],
+                        data: item.data || [],
+                        statuses: item.statuses || {},
+                        assignedTo
+                    };
+                });
                 setDatasets(formattedData);
             }
         } catch (err: any) {
@@ -128,7 +151,7 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         return { headers, data };
     };
 
-    const processUploadQueue = async () => {
+    const processUploadQueue = async (assignedTo?: string) => {
         if (filesToUpload.length === 0) return;
         setUploading(true);
         try {
@@ -138,6 +161,10 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
 
             if (filesToUpload.length > 1) {
                 combinedName = `${filesToUpload[0].name} + ${filesToUpload.length - 1} files`;
+            }
+
+            if (assignedTo) {
+                combinedName = `[${assignedTo}] ${combinedName}`;
             }
 
             // Build index of existing data for duplicate detection
@@ -276,9 +303,21 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
 
     const renameDataset = async (id: string, newName: string) => {
         try {
-            const { error } = await supabase.from('datasets').update({ name: newName }).eq('id', id);
+            let finalName = newName;
+
+            // If user is not admin, force preserve their assignment prefix to prevent accidental loss of access
+            if (currentUser && currentUser !== 'admin') {
+                const currentDataset = datasets.find(d => d.id === id);
+                if (currentDataset?.assignedTo) {
+                    // Remove any user-typed prefix to avoid duplication
+                    const cleanName = newName.replace(/^\[.*?\]\s*/, '');
+                    finalName = `[${currentDataset.assignedTo}] ${cleanName}`;
+                }
+            }
+
+            const { error } = await supabase.from('datasets').update({ name: finalName }).eq('id', id);
             if (error) throw new Error(error.message);
-            setDatasets(prev => prev.map(d => d.id === id ? { ...d, name: newName } : d));
+            setDatasets(prev => prev.map(d => d.id === id ? { ...d, name: finalName } : d));
             showFeedback("Dataset renamed successfully", 'info');
         } catch (e: any) {
             console.error("Rename failed", e.message || e);
@@ -437,15 +476,41 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    // Filter datasets for global access (Dashboard, Accepted, Waitlist)
+    const exposedDatasets = useMemo(() => {
+        if (!currentUser) return [];
+        if (currentUser === 'admin') return datasets;
+
+        return datasets.filter(d => d.assignedTo === currentUser);
+    }, [datasets, currentUser]);
+
+    // Filter clients for global access (Revenue, Client Details)
+    const exposedClients = useMemo(() => {
+        if (!currentUser) return [];
+        if (currentUser === 'admin') return clients;
+
+        return clients.filter(c => {
+            // If client is linked to a dataset, check that dataset's assignment
+            if (c.source_dataset_id) {
+                const sourceDs = datasets.find(d => d.id === c.source_dataset_id);
+                // If the dataset exists and is assigned to the user, show the client
+                return sourceDs?.assignedTo === currentUser;
+            }
+            // If manual client (no source), hide from non-admin to be safe
+            return false;
+        });
+    }, [clients, datasets, currentUser]);
+
     return (
         <LeadFlowContext.Provider
             value={{
-                datasets,
-                visibleDatasets: datasets.filter(d => !d.name.startsWith('__preserved__')),
+                datasets: exposedDatasets,
+                visibleDatasets: exposedDatasets.filter(d => !d.name.startsWith('__preserved__')),
                 loading,
                 refreshDatasets: fetchDatasets,
+                currentUser,
 
-                clients,
+                clients: exposedClients,
                 refreshClients: fetchAllClients,
 
                 filesToUpload,

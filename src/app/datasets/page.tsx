@@ -32,7 +32,8 @@ export default function DatasetsPage() {
         deleteDataset,
         renameDataset,
         searchTerm,
-        setSearchTerm
+        setSearchTerm,
+        currentUser
     } = useLeadFlow();
 
     const router = useRouter();
@@ -41,6 +42,7 @@ export default function DatasetsPage() {
     const [tempName, setTempName] = useState('');
     const [isDragging, setIsDragging] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [selectedAssignee, setSelectedAssignee] = useState<string>('sahana');
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -96,74 +98,92 @@ export default function DatasetsPage() {
                 <div className="max-w-7xl mx-auto space-y-8">
 
                     {/* Upload Section */}
-                    <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
-                        <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <Upload className="w-5 h-5 text-indigo-500" /> Upload New Leads
-                        </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {/* Drag & Drop Area */}
-                            <label
-                                onDragOver={handleDragOver}
-                                onDragLeave={handleDragLeave}
-                                onDrop={handleDrop}
-                                className={`relative flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-2xl transition-all duration-300 cursor-pointer group overflow-hidden h-64 
-                                ${isDragging ? 'border-indigo-500 bg-indigo-50 scale-[1.02] shadow-lg shadow-indigo-500/10' : 'border-indigo-100 bg-indigo-50/30 hover:bg-indigo-50/60 hover:border-indigo-300'}`}
-                            >
-                                <div className={`absolute inset-0 bg-gradient-to-br from-indigo-500/0 to-purple-500/0 transition-all duration-500 ${isDragging ? 'opacity-100 from-indigo-500/5 to-purple-500/5' : 'group-hover:from-indigo-500/5 group-hover:to-purple-500/5'}`} />
-                                <div className={`bg-white p-4 rounded-full shadow-sm mb-4 transition-all duration-300 ${isDragging ? 'scale-110 shadow-md ring-4 ring-indigo-50' : 'group-hover:scale-110 group-hover:shadow-md'}`}>
-                                    <Upload className={`w-8 h-8 transition-colors ${isDragging ? 'text-indigo-600' : 'text-indigo-500'}`} />
-                                </div>
-                                <span className={`text-lg font-semibold transition-colors ${isDragging ? 'text-indigo-700' : 'text-slate-700'}`}>
-                                    {isDragging ? 'Drop CSV Here' : 'Upload CSV'}
-                                </span>
-                                <span className="text-sm text-slate-400 mt-2">Drag file here or click to browse</span>
-                                <input type="file" ref={fileInputRef} className="hidden" accept=".csv" multiple onChange={handleFileSelection} />
-                            </label>
-
-                            {/* Queue Area */}
-                            <div className="flex flex-col h-64 bg-slate-50 rounded-2xl border border-slate-200 p-4">
-                                <div className="flex justify-between items-center mb-4">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Upload Queue ({filesToUpload.length})</span>
-                                    {filesToUpload.length > 0 && (
-                                        <button onClick={clearUploadQueue} className="text-xs font-bold text-rose-500 hover:text-rose-600">CLEAR ALL</button>
-                                    )}
-                                </div>
-
-                                {filesToUpload.length === 0 ? (
-                                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-                                        <FileText className="w-8 h-8 opacity-20 mb-2" />
-                                        <span className="text-sm">No files selected</span>
-                                    </div>
-                                ) : (
-                                    <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar mb-4">
-                                        {filesToUpload.map((f, i) => (
-                                            <div key={i} className="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200">
-                                                <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className="bg-indigo-50 p-1.5 rounded-md">
-                                                        <FileText className="w-4 h-4 text-indigo-500" />
-                                                    </div>
-                                                    <span className="truncate text-sm text-slate-700 font-medium">{f.name}</span>
-                                                    <span className="text-xs text-slate-400">({(f.size / 1024).toFixed(1)} KB)</span>
-                                                </div>
-                                                <button onClick={() => removeFileFromUpload(i)} className="text-slate-400 hover:text-rose-500 transition-colors">
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                <button
-                                    onClick={processUploadQueue}
-                                    disabled={filesToUpload.length === 0 || uploading}
-                                    className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+                    {currentUser === 'admin' && (
+                        <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
+                            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <Upload className="w-5 h-5 text-indigo-500" /> Upload New Leads
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* Drag & Drop Area */}
+                                <label
+                                    onDragOver={handleDragOver}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={handleDrop}
+                                    className={`relative flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-2xl transition-all duration-300 cursor-pointer group overflow-hidden h-64
+                                    ${isDragging ? 'border-indigo-500 bg-indigo-50 scale-[1.02] shadow-lg shadow-indigo-500/10' : 'border-indigo-100 bg-indigo-50/30 hover:bg-indigo-50/60 hover:border-indigo-300'}`}
                                 >
-                                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                    {uploading ? 'Syncing to Cloud...' : 'Process Files'}
-                                </button>
+                                    <div className={`absolute inset-0 bg-gradient-to-br from-indigo-500/0 to-purple-500/0 transition-all duration-500 ${isDragging ? 'opacity-100 from-indigo-500/5 to-purple-500/5' : 'group-hover:from-indigo-500/5 group-hover:to-purple-500/5'}`} />
+                                    <div className={`bg-white p-4 rounded-full shadow-sm mb-4 transition-all duration-300 ${isDragging ? 'scale-110 shadow-md ring-4 ring-indigo-50' : 'group-hover:scale-110 group-hover:shadow-md'}`}>
+                                        <Upload className={`w-8 h-8 transition-colors ${isDragging ? 'text-indigo-600' : 'text-indigo-500'}`} />
+                                    </div>
+                                    <span className={`text-lg font-semibold transition-colors ${isDragging ? 'text-indigo-700' : 'text-slate-700'}`}>
+                                        {isDragging ? 'Drop CSV Here' : 'Upload CSV'}
+                                    </span>
+                                    <span className="text-sm text-slate-400 mt-2">Drag file here or click to browse</span>
+                                    <input type="file" ref={fileInputRef} className="hidden" accept=".csv" multiple onChange={handleFileSelection} />
+                                </label>
+
+                                {/* Queue Area */}
+                                <div className="flex flex-col h-64 bg-slate-50 rounded-2xl border border-slate-200 p-4">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Upload Queue ({filesToUpload.length})</span>
+                                        {filesToUpload.length > 0 && (
+                                            <button onClick={clearUploadQueue} className="text-xs font-bold text-rose-500 hover:text-rose-600">CLEAR ALL</button>
+                                        )}
+                                    </div>
+
+                                    {filesToUpload.length === 0 ? (
+                                        <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                                            <FileText className="w-8 h-8 opacity-20 mb-2" />
+                                            <span className="text-sm">No files selected</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar mb-4">
+                                            {filesToUpload.map((f, i) => (
+                                                <div key={i} className="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200">
+                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                        <div className="bg-indigo-50 p-1.5 rounded-md">
+                                                            <FileText className="w-4 h-4 text-indigo-500" />
+                                                        </div>
+                                                        <span className="truncate text-sm text-slate-700 font-medium">{f.name}</span>
+                                                        <span className="text-xs text-slate-400">({(f.size / 1024).toFixed(1)} KB)</span>
+                                                    </div>
+                                                    <button onClick={() => removeFileFromUpload(i)} className="text-slate-400 hover:text-rose-500 transition-colors">
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {filesToUpload.length > 0 && (
+                                        <div className="mb-4">
+                                            <label className="block text-xs font-bold uppercase text-slate-500 mb-2">Assign To</label>
+                                            <select
+                                                value={selectedAssignee}
+                                                onChange={(e) => setSelectedAssignee(e.target.value)}
+                                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                            >
+                                                <option value="sahana">Sahana</option>
+                                                <option value="himesh">Himesh</option>
+                                                <option value="akash">Akash</option>
+                                                <option value="admin">Admin (Me)</option>
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        onClick={() => processUploadQueue(selectedAssignee)}
+                                        disabled={filesToUpload.length === 0 || uploading}
+                                        className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+                                    >
+                                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                        {uploading ? 'Syncing to Cloud...' : 'Process Files'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Datasets Grid */}
                     <div>
@@ -226,6 +246,11 @@ export default function DatasetsPage() {
                                             ) : (
                                                 <h3 className="font-bold text-slate-800 text-lg mb-1 truncate group-hover:text-indigo-600 transition-colors">
                                                     {ds.name}
+                                                    {currentUser === 'admin' && ds.assignedTo && (
+                                                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-700 font-bold uppercase tracking-wider align-middle">
+                                                            {ds.assignedTo}
+                                                        </span>
+                                                    )}
                                                 </h3>
                                             )}
 
