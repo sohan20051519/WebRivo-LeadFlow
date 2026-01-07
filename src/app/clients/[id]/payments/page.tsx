@@ -630,7 +630,13 @@ export default function ClientPaymentsPage() {
                                                         <div className="text-[10px] uppercase font-bold text-slate-400">{item.type}</div>
                                                     </div>
                                                 </div>
-                                                <div className="font-medium text-slate-600">₹{item.price.toLocaleString()}</div>
+                                                <div className="font-medium text-slate-600">
+                                                    {item.price === 0 && (item.type === 'domain' || item.type === 'package') ? (
+                                                        <span className="text-emerald-500 font-bold text-xs uppercase">Included</span>
+                                                    ) : (
+                                                        `₹${item.price.toLocaleString()}`
+                                                    )}
+                                                </div>
                                             </div>
                                         );
                                     })}

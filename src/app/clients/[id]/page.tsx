@@ -631,23 +631,42 @@ export default function ClientPage() {
                                 <Globe className="w-5 h-5 text-indigo-500" /> Domains Needed
                             </h3>
                             <div className="space-y-2">
-                                {DOMAINS_LIST.map(d => (
-                                    <div key={d.id}
-                                        onClick={() => {
-                                            const has = (client.domains || []).some(x => x === d.id);
-                                            // Simple toggle logic for TLD as string
-                                            if (has) {
-                                                handleChange('domains', (client.domains || []).filter(x => x !== d.id));
-                                            } else {
-                                                handleChange('domains', [...(client.domains || []), d.id]);
+                                {DOMAINS_LIST.map(d => {
+                                    const has = (client.domains || []).some(x => x === d.id);
+                                    let isFree = false;
+
+                                    if (client.selected_package === 'business' && d.id === 'in') {
+                                        isFree = true;
+                                    } else if (client.selected_package === 'premium' && has) {
+                                        const selectedDomains = (client.domains || [])
+                                            .map(id => DOMAINS_LIST.find(x => x.id === id))
+                                            .filter(x => x !== undefined) as typeof DOMAINS_LIST;
+
+                                        if (selectedDomains.length > 0) {
+                                            const maxPrice = Math.max(...selectedDomains.map(x => x.price));
+                                            const freeDomain = selectedDomains.find(x => x.price === maxPrice);
+                                            if (freeDomain?.id === d.id) {
+                                                isFree = true;
                                             }
-                                        }}
-                                        className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer border transition-all ${(client.domains || []).includes(d.id) ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
-                                    >
-                                        <span>{d.name}</span>
-                                        <span className="text-xs font-bold">+₹{d.price}</span>
-                                    </div>
-                                ))}
+                                        }
+                                    }
+
+                                    return (
+                                        <div key={d.id}
+                                            onClick={() => {
+                                                if (has) {
+                                                    handleChange('domains', (client.domains || []).filter(x => x !== d.id));
+                                                } else {
+                                                    handleChange('domains', [...(client.domains || []), d.id]);
+                                                }
+                                            }}
+                                            className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer border transition-all ${has ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
+                                        >
+                                            <span>{d.name}</span>
+                                            <span className="text-xs font-bold">{isFree ? 'Free' : `+₹${d.price}`}</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                             <div className="mt-4 pt-4 border-t border-slate-100">
                                 <label className="block text-xs font-bold text-slate-700 mb-2">Specific Domain Names</label>
