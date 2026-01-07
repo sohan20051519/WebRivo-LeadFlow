@@ -6,7 +6,8 @@ import { useLeadFlow } from '@/context/LeadFlowContext';
 import {
     ArrowLeft, Loader2, Plus, Upload, CheckCircle2, Copy,
     ExternalLink, RefreshCw, FileText, XCircle, Trash2,
-    MessageCircle, IndianRupee, Pencil, Receipt, Link as LinkIcon, User
+    MessageCircle, IndianRupee, Pencil, Receipt, Link as LinkIcon, User,
+    CreditCard
 } from 'lucide-react';
 import { Client, PaymentRecord } from '@/types';
 import { USER_LABELS } from '@/constants';
@@ -53,6 +54,13 @@ const PLAN_INCLUDES: Record<string, string[]> = {
     custom: []
 };
 
+const PLAN_ADVANCE_LINKS: Record<string, string> = {
+    basic: 'https://payments.cashfree.com/forms/webrivo-basic',
+    business: 'https://payments.cashfree.com/forms/webrivo-business',
+    premium: 'https://payments.cashfree.com/forms/webrivo-premium',
+};
+
+const DEFAULT_ADVANCE_LINK = 'https://payments.cashfree.com/forms/webrivo';
 
 const PaymentModal = ({
     isOpen,
@@ -103,7 +111,7 @@ const PaymentModal = ({
             <div className={`bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-bold text-lg text-slate-800">
-                        {isEditMode ? 'Edit Payment Record' : 'Record Manual Payment'}
+                        {isEditMode ? 'Edit Payment Record' : 'Record Payment'}
                     </h3>
                     <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
                         <XCircle className="w-5 h-5 text-slate-400" />
@@ -238,6 +246,9 @@ export default function ClientPaymentsPage() {
     const [modalInitialData, setModalInitialData] = useState<any>(null);
     const [processingPayment, setProcessingPayment] = useState(false);
 
+    // Type selection modal state
+    const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false);
+
     // Derived Breakdown
     const [billOfMaterials, setBillOfMaterials] = useState<BillItem[]>([]);
 
@@ -336,6 +347,25 @@ export default function ClientPaymentsPage() {
 
     // --- Actions ---
 
+    // Triggered when clicking "Record Payment" button
+    const handleInitialRecordClick = () => {
+        setIsTypeSelectionOpen(true);
+    };
+
+    const handleSelectPaymentType = (type: 'advance' | 'full') => {
+        setIsTypeSelectionOpen(false);
+        const amount = type === 'advance' ? 100 : outstanding;
+        const notes = type === 'advance' ? 'Advance Payment' : '';
+
+        // Open the modal with pre-filled data
+        setModalInitialData({
+            amount: amount,
+            file: null,
+            statusAction: (type === 'full' && outstanding <= amount) ? 'paid' : 'none'
+        });
+        setIsPyModalOpen(true);
+    };
+
     const handleOpenPaymentModal = (file: File | null = null, existingRecord: PaymentRecord | null = null) => {
         if (existingRecord) {
             // Edit Mode
@@ -345,15 +375,16 @@ export default function ClientPaymentsPage() {
                 proof_url: existingRecord.proof_url,
                 statusAction: client?.payment_status === 'paid' ? 'paid' : 'none'
             });
+            setIsPyModalOpen(true);
         } else {
-            // Create Mode
+            // Create Mode via Drag & Drop (defaults to full outstanding or just opens modal)
             setModalInitialData({
                 amount: file ? outstanding : 0,
                 file: file,
                 statusAction: outstanding <= 0 ? 'paid' : 'none'
             });
+            setIsPyModalOpen(true);
         }
-        setIsPyModalOpen(true);
     };
 
     const handlePaymentSubmit = async (data: any) => {
@@ -386,7 +417,7 @@ export default function ClientPaymentsPage() {
                 await addPaymentRecord({
                     client_id: client.id,
                     amount: data.amount,
-                    notes: data.file ? 'Proof via PDF Upload' : (data.proofLink ? 'Payment Link Entry' : 'Manual Entry'),
+                    notes: data.file ? 'Proof via PDF Upload' : (data.proofLink ? 'Payment Link Entry' : (data.amount === 100 ? 'Advance Payment' : 'Manual Entry')),
                     proof_url: proofUrl,
                 });
                 showFeedback('Payment Recorded Successfully', 'success');
@@ -465,6 +496,33 @@ export default function ClientPaymentsPage() {
         window.open(url, '_blank');
     };
 
+    const handleAdvanceWhatsAppReminder = () => {
+        if (!client) return;
+
+        // Determine correct link
+        let advanceLink = client.advance_payment_link || DEFAULT_ADVANCE_LINK;
+        // If plan specific, override just in case (though UI should handle it)
+        if (PLAN_ADVANCE_LINKS[client.selected_package]) {
+            advanceLink = PLAN_ADVANCE_LINKS[client.selected_package];
+        }
+
+        let text = `*ADVANCE PAYMENT REQUEST*\n`;
+        text += `For: *${client.business_name}* (${client.contact_name})\n`;
+        text += `--------------------------------\n`;
+        text += `*TOTAL DEAL VALUE: ₹${client.total_deal_value}*\n`;
+        text += `--------------------------------\n`;
+        text += `Please pay the advance amount to confirm your order.\n\n`;
+        text += `*Advance Amount: ₹100*\n`;
+        text += `Note: This ₹100 will be deducted from your total deal value.\n\n`;
+        text += `*Payment Link*: ${advanceLink}\n`;
+
+        const phone = client.phone?.replace(/[^\d]/g, '');
+        const formattedPhone = phone?.length === 10 ? `91${phone}` : phone;
+
+        const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+        window.open(url, '_blank');
+    }
+
     // --- Drag & Drop ---
     const [isDragging, setIsDragging] = useState(false);
     const dragCounter = useRef(0);
@@ -496,6 +554,12 @@ export default function ClientPaymentsPage() {
         }
     };
 
+    // Determine if Advance Link is editable
+    const isAdvanceLinkLocked = !!PLAN_ADVANCE_LINKS[client?.selected_package || ''];
+    const displayedAdvanceLink = isAdvanceLinkLocked
+        ? PLAN_ADVANCE_LINKS[client?.selected_package || '']
+        : (client?.advance_payment_link || DEFAULT_ADVANCE_LINK);
+
     if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading...</div>;
     if (!client) return <div className="min-h-screen flex items-center justify-center text-slate-400">Client not found</div>;
 
@@ -519,6 +583,41 @@ export default function ClientPaymentsPage() {
                 </div>
             )}
 
+            {/* Payment Type Selection Modal */}
+            {isTypeSelectionOpen && (
+                <div className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-200">
+                        <h3 className="text-lg font-bold text-slate-800 mb-4 text-center">Select Payment Type</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <button
+                                onClick={() => handleSelectPaymentType('advance')}
+                                className="flex flex-col items-center justify-center p-4 bg-indigo-50 border border-indigo-100 rounded-xl hover:bg-indigo-100 transition-colors"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-indigo-200 text-indigo-700 flex items-center justify-center mb-2 font-bold">₹</div>
+                                <span className="font-bold text-indigo-700">Advance</span>
+                                <span className="text-xs text-indigo-400">₹100.00</span>
+                            </button>
+                            <button
+                                onClick={() => handleSelectPaymentType('full')}
+                                className="flex flex-col items-center justify-center p-4 bg-emerald-50 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-colors"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-emerald-200 text-emerald-700 flex items-center justify-center mb-2">
+                                    <Receipt className="w-5 h-5" />
+                                </div>
+                                <span className="font-bold text-emerald-700">Full / Manual</span>
+                                <span className="text-xs text-emerald-500">Other Amount</span>
+                            </button>
+                        </div>
+                        <button
+                            onClick={() => setIsTypeSelectionOpen(false)}
+                            className="mt-6 w-full py-3 text-slate-400 font-bold text-sm hover:text-slate-600"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <PaymentModal
                 isOpen={isPyModalOpen}
                 onClose={() => setIsPyModalOpen(false)}
@@ -530,62 +629,116 @@ export default function ClientPaymentsPage() {
             <main className="flex-1 overflow-y-auto w-full">
                 <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
                     {/* Header */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
-                                <ArrowLeft className="w-5 h-5" />
-                            </button>
-                            <div>
-                                <h1 className="text-xl font-bold text-slate-800">Financial Overview</h1>
-                                <p className="text-slate-500 text-sm flex items-center gap-2">
-                                    {client.business_name}
-                                    {currentUser === 'admin' && client.assigned_user && (
-                                        <span className="flex items-center gap-1 text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider">
-                                            <User className="w-3 h-3" /> {USER_LABELS[client.assigned_user] || client.assigned_user}
-                                        </span>
-                                    )}
-                                </p>
-                            </div>
-                        </div>
+                    <div className="flex flex-col gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 
-                        {/* Quick Main Link Input */}
-                        <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center flex-1 max-w-md mx-6">
-                            <div className="pl-3 pr-2 text-slate-400">
-                                <LinkIcon className="w-4 h-4" />
-                            </div>
-                            <input
-                                className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400"
-                                placeholder="Paste Main Payment Link here..."
-                                value={client.manual_payment_link || ''}
-                                onChange={(e) => setClient({ ...client, manual_payment_link: e.target.value })}
-                                onBlur={() => updateClient(client.id, { manual_payment_link: client.manual_payment_link })}
-                            />
-                            {client.manual_payment_link && (
-                                <button
-                                    onClick={() => { navigator.clipboard.writeText(client.manual_payment_link || ''); showFeedback('Copied!', 'success'); }}
-                                    className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
-                                    title="Copy Link"
-                                >
-                                    <Copy className="w-3 h-3" />
+                        {/* Top Row: Back, Title, User */}
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
+                                    <ArrowLeft className="w-5 h-5" />
                                 </button>
-                            )}
+                                <div>
+                                    <h1 className="text-xl font-bold text-slate-800">Financial Overview</h1>
+                                    <p className="text-slate-500 text-sm flex items-center gap-2">
+                                        {client.business_name}
+                                        {currentUser === 'admin' && client.assigned_user && (
+                                            <span className="flex items-center gap-1 text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider">
+                                                <User className="w-3 h-3" /> {USER_LABELS[client.assigned_user] || client.assigned_user}
+                                            </span>
+                                        )}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                                {/* Advance Breakdown Button */}
+                                <button
+                                    onClick={handleAdvanceWhatsAppReminder}
+                                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold rounded-lg transition-colors flex items-center gap-2 border border-indigo-200 text-xs"
+                                >
+                                    <MessageCircle className="w-3 h-3" />
+                                    Send Advance Breakdown
+                                </button>
+
+                                <button
+                                    onClick={handleWhatsAppReminder}
+                                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shadow-green-200 text-sm"
+                                >
+                                    <MessageCircle className="w-4 h-4" />
+                                    Send Breakdown
+                                </button>
+                                <button
+                                    onClick={() => handleInitialRecordClick()}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200 text-sm"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Record Payment
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleWhatsAppReminder}
-                                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shadow-green-200 text-sm"
-                            >
-                                <MessageCircle className="w-4 h-4" />
-                                Send Breakdown
-                            </button>
-                            <button
-                                onClick={() => handleOpenPaymentModal()}
-                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200 text-sm"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Record Payment
-                            </button>
+                        {/* Links Row */}
+                        <div className="flex flex-col md:flex-row gap-4 pt-2 border-t border-slate-50">
+
+                            {/* Main Payment Link */}
+                            <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center flex-1">
+                                <div className="pl-3 pr-2 text-slate-400">
+                                    <LinkIcon className="w-4 h-4" />
+                                </div>
+                                <input
+                                    className="bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400"
+                                    placeholder="Paste Main Payment Link here..."
+                                    value={client.manual_payment_link || ''}
+                                    onChange={(e) => setClient({ ...client, manual_payment_link: e.target.value })}
+                                    onBlur={() => updateClient(client.id, { manual_payment_link: client.manual_payment_link })}
+                                />
+                                {client.manual_payment_link && (
+                                    <button
+                                        onClick={() => { navigator.clipboard.writeText(client.manual_payment_link || ''); showFeedback('Copied!', 'success'); }}
+                                        className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
+                                        title="Copy Link"
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Advance Payment Link */}
+                            <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-1 items-center flex-1 relative">
+                                <div className="pl-3 pr-2 text-slate-400">
+                                    <CreditCard className="w-4 h-4" />
+                                </div>
+                                <input
+                                    className={`bg-transparent text-sm outline-none flex-1 text-slate-700 font-medium placeholder:text-slate-400 ${isAdvanceLinkLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                    placeholder="Advance Payment Link..."
+                                    value={displayedAdvanceLink}
+                                    readOnly={isAdvanceLinkLocked}
+                                    onChange={(e) => {
+                                        if (!isAdvanceLinkLocked) {
+                                            setClient({ ...client, advance_payment_link: e.target.value });
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        if (!isAdvanceLinkLocked) {
+                                            updateClient(client.id, { advance_payment_link: client.advance_payment_link });
+                                        }
+                                    }}
+                                />
+                                {isAdvanceLinkLocked && (
+                                    <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 mr-2">
+                                        Fixed
+                                    </span>
+                                )}
+                                {displayedAdvanceLink && (
+                                    <button
+                                        onClick={() => { navigator.clipboard.writeText(displayedAdvanceLink); showFeedback('Copied!', 'success'); }}
+                                        className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500"
+                                        title="Copy Link"
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -686,7 +839,7 @@ export default function ClientPaymentsPage() {
                                             Record manual payments or upload proof of payment to start tracking.
                                         </p>
                                         <button
-                                            onClick={() => handleOpenPaymentModal()}
+                                            onClick={() => handleInitialRecordClick()}
                                             className="px-4 py-2 bg-indigo-50 text-indigo-600 font-bold rounded-lg text-sm hover:bg-indigo-100 transition-colors"
                                         >
                                             Add First Payment
