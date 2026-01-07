@@ -452,24 +452,76 @@ export default function ClientPaymentsPage() {
             mainLink = PLAN_LINKS[client.selected_package];
         }
 
+        // Calculated Outstanding for Message (Total - 100 - (Paid - 100 paid to advance?))
+        // Simplification: We treat 'Net Payable' as (Total - 100).
+        // Outstanding is (Net Payable - (TotalPaid that is NOT advance)).
+        // Since we don't distinguish payment types easily, we assume the first 100 of any payment covers the advance.
+        // So Outstanding = (Total - 100) - Math.max(0, TotalPaid - 100).
+        // Which simplifies to: Total - 100 - TotalPaid + 100 (if Paid > 100) => Total - TotalPaid = System Outstanding.
+        // BUT if Paid=0, it is Total - 100.
+        // So OutstandingMessage = SystemOutstanding - 100 + Math.min(TotalPaid, 100).
+        // If Paid=0: O - 100.
+        // If Paid=100: O - 100 + 100 = O.
+
+        // Wait, simpler logic based on user request:
+        // User wants "OUTSTANDING DUE" to match "NET PAYABLE" (7899) when nothing is paid (7999 total).
+        // So they want to deduct 100 from the System Outstanding unless it's already accounted for?
+        // Let's use: (Total - 100) - (Paid).
+        // If Paid=0, Outstanding=7899.
+        // If Paid=100 (Advance), Outstanding=7799. This is wrong if the user still owes 7899.
+        // IF Paid=100, the user likely paid the advance. So they owe 7899.
+        // So if Paid=100, we want to show 7899.
+        // My formula (T-100-P) gives 7799.
+
+        // Let's assume the user logic is:
+        // Invoice is for BALANCE.
+        // Balance = Total - 100.
+        // Paid Balance = TotalPaid - 100 (assuming 100 covers advance).
+        // Outstanding Balance = Balance - Paid Balance.
+        // = (Total - 100) - (TotalPaid - 100)
+        // = Total - TotalPaid = System Outstanding.
+
+        // So mathematically, System Outstanding IS the correct Balance Outstanding IF paid > 100.
+        // BUT if Paid < 100 (e.g. 0), then Paid Balance is negative? No.
+        // If Paid=0. Balance=7900. Paid Balance=0. Outstanding=7900.
+        // Why does the user want 7900?
+        // Ah, the user complains: "even after deducting 100rs from advance still it is showing ... OUTSTANDING DUE: 7999" (Total).
+        // They want it to show 7899.
+        // So when Paid=0, they want Total-100.
+
+        // So:
+        // If Paid=0: Show Total - 100.
+        // If Paid=100: Show Total - 100. (Since 100 covers advance, 0 covers balance).
+        // If Paid=200: Show Total - 200. (100 advance, 100 balance).
+
+        // Formula: Total - 100 - Math.max(0, TotalPaid - 100).
+        // Paid=0: T - 100 - 0 = T-100. (Correct).
+        // Paid=100: T - 100 - 0 = T-100. (Correct).
+        // Paid=200: T - 100 - 100 = T-200. (Correct).
+
+        const netPayable = Math.max(0, (client.total_deal_value || 0) - 100);
+        // We consider 'paid against balance' as anything above 100.
+        const paidAgainstBalance = Math.max(0, safeTotalPaid - 100);
+        const outstandingBalance = Math.max(0, netPayable - paidAgainstBalance);
+
         // Construct Invoice-like Message
         let text = `*INVOICE SUMMARY*\n`;
         text += `For: *${client.business_name}* (${client.contact_name})\n`;
         text += `--------------------------------\n`;
 
         billOfMaterials.forEach(item => {
-            text += `• ${item.name}: ₹${item.price}\n`;
+            text += `  ${item.name}: ₹${item.price}\n`;
         });
 
         text += `--------------------------------\n`;
         text += `*TOTAL DEAL VALUE: ₹${client.total_deal_value}*\n`;
         text += `Less Advance: -₹100\n`;
-        text += `*NET PAYABLE: ₹${Math.max(0, (client.total_deal_value || 0) - 100)}*\n`;
+        text += `*NET PAYABLE: ₹${netPayable}*\n\n`;
 
-        text += `✅ Amount Paid So Far: ₹${safeTotalPaid}\n`;
-        text += `🚨 *OUTSTANDING DUE: ₹${outstanding}*\n\n`;
+        text += `Amount Paid So Far: ₹${safeTotalPaid}\n`;
+        text += `*OUTSTANDING DUE: ₹${outstandingBalance}*\n\n`;
 
-        if (outstanding > 0) {
+        if (outstandingBalance > 0) {
             text += `Please clear the remaining balance to avoid service interruption.\n\n`;
         } else {
             text += `Thank you for your business! All dues are cleared.\n\n`;
