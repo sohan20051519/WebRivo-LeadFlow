@@ -27,7 +27,7 @@ import { GlobalStats, LeadStatus } from '@/types';
 const COLORS = ['#8b5cf6', '#10b981', '#f59e0b', '#f43f5e', '#94a3b8']; // Violet, Emerald, Amber, Rose, Slate
 
 export default function DashboardPage() {
-    const { datasets, visibleDatasets, loading, refreshDatasets, searchTerm, deleteDataset, clients, updateLeadStatus } = useLeadFlow();
+    const { datasets, visibleDatasets, loading, refreshDatasets, searchTerm, deleteDataset, clients, updateLeadStatus, currentUser } = useLeadFlow();
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
     // Revenue Calculations
@@ -476,7 +476,14 @@ export default function DashboardPage() {
                                                         {deletingId === ds.id ? <Loader2 className="w-5 h-5 animate-spin text-rose-500" /> : <FileText className="w-5 h-5" />}
                                                     </div>
                                                     <div>
-                                                        <p className="font-bold text-sm text-slate-700 group-hover:text-indigo-600 transition-colors">{ds.name}</p>
+                                                        <p className="font-bold text-sm text-slate-700 group-hover:text-indigo-600 transition-colors">
+                                                            {ds.name}
+                                                            {currentUser === 'admin' && ds.assignedTo && (
+                                                                <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-700 font-bold uppercase tracking-wider">
+                                                                    {ds.assignedTo}
+                                                                </span>
+                                                            )}
+                                                        </p>
                                                         <p className="text-[10px] font-medium text-slate-400">{ds.createdAt ? new Date(ds.createdAt).toLocaleDateString() : 'Just now'}</p>
                                                     </div>
                                                 </div>

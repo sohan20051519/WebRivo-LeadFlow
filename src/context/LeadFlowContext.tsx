@@ -25,7 +25,10 @@ interface LeadFlowContextType {
     removeFileFromUpload: (index: number) => void;
     clearUploadQueue: () => void;
     uploading: boolean;
-    processUploadQueue: () => Promise<void>;
+    processUploadQueue: (assignedTo?: string) => Promise<void>;
+
+    // User
+    currentUser: string | null;
 
     // Operations
     deleteDataset: (id: string) => Promise<boolean>;
@@ -62,11 +65,18 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
+    const [currentUser, setCurrentUser] = useState<string | null>(null);
 
     const showFeedback = (text: string, type: 'success' | 'info' | 'error' = 'info') => {
         setFeedback({ text, type });
         setTimeout(() => setFeedback(null), 3000);
     };
+
+    useEffect(() => {
+        // Load user from session storage
+        const user = sessionStorage.getItem('leadflow_user');
+        setCurrentUser(user);
+    }, []);
 
     // ... (existing fetch datasets)
 
@@ -81,14 +91,28 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
             if (error) throw new Error(error.message);
 
             if (data) {
-                const formattedData: Dataset[] = data.map((item: any) => ({
-                    id: item.id,
-                    name: item.name,
-                    createdAt: new Date(item.created_at),
-                    headers: item.headers || [],
-                    data: item.data || [],
-                    statuses: item.statuses || {}
-                }));
+                const formattedData: Dataset[] = data.map((item: any) => {
+                    let assignedTo = undefined;
+                    // Check for [user] prefix
+                    const match = item.name.match(/^\[(.*?)]\s+(.*)$/);
+                    if (match) {
+                        assignedTo = match[1];
+                        // We keep the original name for DB consistency but we could strip it for display if needed.
+                        // For now, let's keep it as is, or strip it here?
+                        // If we strip it here, we need to be careful when renaming/deleting.
+                        // Let's keep the name as is but add the assignedTo field.
+                    }
+
+                    return {
+                        id: item.id,
+                        name: item.name,
+                        createdAt: new Date(item.created_at),
+                        headers: item.headers || [],
+                        data: item.data || [],
+                        statuses: item.statuses || {},
+                        assignedTo
+                    };
+                });
                 setDatasets(formattedData);
             }
         } catch (err: any) {
@@ -128,7 +152,7 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         return { headers, data };
     };
 
-    const processUploadQueue = async () => {
+    const processUploadQueue = async (assignedTo?: string) => {
         if (filesToUpload.length === 0) return;
         setUploading(true);
         try {
@@ -138,6 +162,10 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
 
             if (filesToUpload.length > 1) {
                 combinedName = `${filesToUpload[0].name} + ${filesToUpload.length - 1} files`;
+            }
+
+            if (assignedTo) {
+                combinedName = `[${assignedTo}] ${combinedName}`;
             }
 
             // Build index of existing data for duplicate detection
@@ -276,9 +304,21 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
 
     const renameDataset = async (id: string, newName: string) => {
         try {
-            const { error } = await supabase.from('datasets').update({ name: newName }).eq('id', id);
+            let finalName = newName;
+
+            // If user is not admin, force preserve their assignment prefix to prevent accidental loss of access
+            if (currentUser && currentUser !== 'admin') {
+                const currentDataset = datasets.find(d => d.id === id);
+                if (currentDataset?.assignedTo) {
+                    // Remove any user-typed prefix to avoid duplication
+                    const cleanName = newName.replace(/^\[.*?\]\s*/, '');
+                    finalName = `[${currentDataset.assignedTo}] ${cleanName}`;
+                }
+            }
+
+            const { error } = await supabase.from('datasets').update({ name: finalName }).eq('id', id);
             if (error) throw new Error(error.message);
-            setDatasets(prev => prev.map(d => d.id === id ? { ...d, name: newName } : d));
+            setDatasets(prev => prev.map(d => d.id === id ? { ...d, name: finalName } : d));
             showFeedback("Dataset renamed successfully", 'info');
         } catch (e: any) {
             console.error("Rename failed", e.message || e);
@@ -437,13 +477,32 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const getVisibleDatasets = () => {
+        const baseFiltered = datasets.filter(d => !d.name.startsWith('__preserved__'));
+
+        // If not logged in or admin, assume showing all (or wait for auth).
+        // If admin, show all.
+        if (!currentUser || currentUser === 'admin') {
+            return baseFiltered;
+        }
+
+        // Otherwise filter by assignedTo
+        return baseFiltered.filter(d => {
+            // Check if dataset is assigned to current user
+            // We use the parsed assignedTo field or check the name prefix directly as fallback
+            const assignedName = d.assignedTo || (d.name.match(/^\[(.*?)]/)?.[1]);
+            return assignedName === currentUser;
+        });
+    };
+
     return (
         <LeadFlowContext.Provider
             value={{
                 datasets,
-                visibleDatasets: datasets.filter(d => !d.name.startsWith('__preserved__')),
+                visibleDatasets: getVisibleDatasets(),
                 loading,
                 refreshDatasets: fetchDatasets,
+                currentUser,
 
                 clients,
                 refreshClients: fetchAllClients,

@@ -32,7 +32,8 @@ export default function DatasetsPage() {
         deleteDataset,
         renameDataset,
         searchTerm,
-        setSearchTerm
+        setSearchTerm,
+        currentUser
     } = useLeadFlow();
 
     const router = useRouter();
@@ -41,6 +42,7 @@ export default function DatasetsPage() {
     const [tempName, setTempName] = useState('');
     const [isDragging, setIsDragging] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [selectedAssignee, setSelectedAssignee] = useState<string>('sahana');
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -153,8 +155,24 @@ export default function DatasetsPage() {
                                     </div>
                                 )}
 
+                                {currentUser === 'admin' && filesToUpload.length > 0 && (
+                                    <div className="mb-4">
+                                        <label className="block text-xs font-bold uppercase text-slate-500 mb-2">Assign To</label>
+                                        <select
+                                            value={selectedAssignee}
+                                            onChange={(e) => setSelectedAssignee(e.target.value)}
+                                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                        >
+                                            <option value="sahana">Sahana</option>
+                                            <option value="himesh">Himesh</option>
+                                            <option value="akash">Akash</option>
+                                            <option value="admin">Admin (Me)</option>
+                                        </select>
+                                    </div>
+                                )}
+
                                 <button
-                                    onClick={processUploadQueue}
+                                    onClick={() => processUploadQueue(currentUser === 'admin' ? selectedAssignee : undefined)}
                                     disabled={filesToUpload.length === 0 || uploading}
                                     className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
                                 >
