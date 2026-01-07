@@ -14,5 +14,5 @@ WHERE assigned_user IS NULL AND name ~ '^\[(.*?)\]';
 UPDATE clients c
 SET assigned_user = d.assigned_user
 FROM datasets d
-WHERE c.source_dataset_id = d.id
+WHERE c.source_dataset_id::uuid = d.id
 AND c.assigned_user IS NULL;
