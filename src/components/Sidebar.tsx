@@ -22,6 +22,7 @@ export default function Sidebar() {
     const {
         mobileMenuOpen,
         setMobileMenuOpen,
+        currentUser
     } = useLeadFlow();
 
     const pathname = usePathname();
@@ -90,8 +91,20 @@ export default function Sidebar() {
 
                     </div>
 
-                    {/* Legal & Support Hub Link - Fixed at Bottom */}
-                    <div className="p-4 border-t border-slate-100">
+                    {/* User Profile & Legal - Fixed at Bottom */}
+                    <div className="p-4 border-t border-slate-100 space-y-2">
+                        {currentUser && (
+                            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-slate-50 border border-slate-100">
+                                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold uppercase text-xs">
+                                    {currentUser[0]}
+                                </div>
+                                <div className="flex flex-col overflow-hidden">
+                                    <span className="text-sm font-bold text-slate-700 capitalize truncate">{currentUser}</span>
+                                    <span className="text-[10px] text-slate-400 truncate">Authorized User</span>
+                                </div>
+                            </div>
+                        )}
+
                         <Link
                             href="/legal"
                             onClick={() => setMobileMenuOpen(false)}
