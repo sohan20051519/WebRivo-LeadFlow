@@ -2,7 +2,6 @@
 
 import { useLeadFlow } from '@/context/LeadFlowContext';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
     Upload,
     X,
@@ -207,7 +206,11 @@ export default function DatasetsPage() {
                                 const completion = total > 0 ? Math.round((processed / total) * 100) : 0;
 
                                 return (
-                                    <Link key={ds.id} href={`/dataset/${ds.id}`} className="group block bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all overflow-hidden relative">
+                                    <div
+                                        key={ds.id}
+                                        onClick={() => router.push(`/dataset/${ds.id}`)}
+                                        className="group block bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all overflow-hidden relative cursor-pointer"
+                                    >
                                         {/* Progress Bar Top */}
                                         <div className="absolute top-0 left-0 right-0 h-1 bg-slate-100">
                                             <div className="h-full bg-indigo-500 transition-all" style={{ width: `${completion}%` }} />
@@ -218,7 +221,7 @@ export default function DatasetsPage() {
                                                 <div className="bg-indigo-50 p-2 rounded-lg">
                                                     <FileText className="w-6 h-6 text-indigo-500" />
                                                 </div>
-                                                <div className="flex gap-1" onClick={(e) => e.preventDefault()}>
+                                                <div className="flex gap-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                                                     <button
                                                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingId(ds.id); setTempName(ds.name); }}
                                                         className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Rename"
@@ -235,7 +238,7 @@ export default function DatasetsPage() {
                                             </div>
 
                                             {editingId === ds.id ? (
-                                                <div className="mb-2" onClick={(e) => e.preventDefault()}>
+                                                <div className="mb-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                                                     <input
                                                         autoFocus
                                                         value={tempName}
@@ -251,7 +254,7 @@ export default function DatasetsPage() {
                                                     <span className="truncate">{ds.name}</span>
                                                     {currentUser === 'admin' && (
                                                         assigningId === ds.id ? (
-                                                            <div className="ml-2 inline-flex items-center gap-1" onClick={(e) => e.preventDefault()}>
+                                                            <div className="ml-2 inline-flex items-center gap-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                                                                 <select
                                                                     value={ds.assignedUser || ds.assignedTo || ''}
                                                                     onChange={(e) => {
@@ -306,7 +309,7 @@ export default function DatasetsPage() {
                                                 </div>
                                             </div>
                                         </div>
-                                    </Link>
+                                    </div>
                                 );
                             })}
                         </div>
