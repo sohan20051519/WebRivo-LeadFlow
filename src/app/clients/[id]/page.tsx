@@ -361,7 +361,7 @@ export default function ClientPage() {
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-slate-800 flex flex-wrap items-center gap-2">
+                        <h1 className="text-xl font-bold text-slate-900 flex flex-wrap items-center gap-2">
                             {client.business_name}
                             <span className={`text-[10px] px-2 py-0.5 rounded-full text-white uppercase tracking-wider ${STATUSES.find(s => s.id === client.status)?.color || 'bg-gray-400'}`}>
                                 {STATUSES.find(s => s.id === client.status)?.label}
@@ -419,67 +419,16 @@ export default function ClientPage() {
                     {/* === MAIN CONTENT (Left - 8 cols) === */}
                     <div className="lg:col-span-8 space-y-6">
 
-                        {/* Scope & Features Configuration */}
-                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                                <Layers className="w-5 h-5 text-indigo-500" /> Project Scope & Features
-                            </h3>
-
-                            {/* Core Upgrades */}
-                            <div className="mb-6">
-                                <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Core Upgrades</label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                    {FEATURES.map(f => {
-                                        const isIncluded = (PLAN_INCLUDES[client.selected_package] || []).includes(f.id);
-                                        const isSelected = (client.core_upgrades || []).includes(f.id);
-
-                                        if (isIncluded) return null; // Don't show if already in plan
-
-                                        return (
-                                            <div key={f.id}
-                                                onClick={() => handleArrayToggle('core_upgrades', f.id)}
-                                                className={`flex flex-col justify-center p-3 rounded-xl text-sm cursor-pointer border-2 transition-all relative ${isSelected ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-sm' : 'bg-white border-slate-100 text-slate-500 hover:border-indigo-100 hover:shadow-sm'}`}
-                                            >
-                                                {isSelected && <div className="absolute top-2 right-2 text-indigo-500"><CheckCircle className="w-4 h-4" /></div>}
-                                                <span className="font-semibold pr-4">{f.name}</span>
-                                                <span className="text-xs mt-1 font-bold">+₹{f.price}</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Add-ons */}
-                            <div>
-                                <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Add-ons & Services</label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                    {ADDONS.map(a => {
-                                        const isSelected = (client.add_ons || []).includes(a.id);
-                                        return (
-                                            <div key={a.id}
-                                                onClick={() => handleArrayToggle('add_ons', a.id)}
-                                                className={`flex flex-col justify-center p-3 rounded-xl text-sm cursor-pointer border-2 transition-all relative ${isSelected ? 'bg-amber-50 border-amber-400 text-amber-800 shadow-sm' : 'bg-white border-slate-100 text-slate-500 hover:border-amber-100 hover:shadow-sm'}`}
-                                            >
-                                                {isSelected && <div className="absolute top-2 right-2 text-amber-500"><CheckCircle className="w-4 h-4" /></div>}
-                                                <span className="font-semibold pr-4">{a.name}</span>
-                                                <span className="text-xs mt-1 font-bold">+₹{a.price}</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Technical Setup (Merged Domains + Links) */}
-                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                         {/* Technical Setup (Moved to Top) */}
+                         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
                                 <Cpu className="w-5 h-5 text-indigo-500" /> Technical Setup
                             </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Domains */}
                                 <div className="space-y-4">
-                                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">Domains Needed</label>
+                                    <label className="block text-xs font-bold text-indigo-600 uppercase tracking-wide">Domains Needed</label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {DOMAINS_LIST.map(d => {
                                             const has = (client.domains || []).some(x => x === d.id);
@@ -532,7 +481,7 @@ export default function ClientPage() {
 
                                 {/* Technical Links */}
                                 <div className="space-y-3">
-                                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">Repository & Deployment</label>
+                                    <label className="block text-xs font-bold text-indigo-600 uppercase tracking-wide">Repository & Deployment</label>
 
                                     <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-400 transition-colors">
                                         <Globe className="w-4 h-4 text-indigo-400" />
@@ -568,9 +517,60 @@ export default function ClientPage() {
                             </div>
                         </div>
 
+                        {/* Scope & Features Configuration */}
+                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                                <Layers className="w-5 h-5 text-indigo-500" /> Project Scope & Features
+                            </h3>
+
+                            {/* Core Upgrades */}
+                            <div className="mb-6">
+                                <label className="block text-xs font-bold text-indigo-600 mb-2 uppercase tracking-wide">Core Upgrades</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                    {FEATURES.map(f => {
+                                        const isIncluded = (PLAN_INCLUDES[client.selected_package] || []).includes(f.id);
+                                        const isSelected = (client.core_upgrades || []).includes(f.id);
+
+                                        if (isIncluded) return null; // Don't show if already in plan
+
+                                        return (
+                                            <div key={f.id}
+                                                onClick={() => handleArrayToggle('core_upgrades', f.id)}
+                                                className={`flex flex-col justify-center p-3 rounded-xl text-sm cursor-pointer border-2 transition-all relative ${isSelected ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-sm' : 'bg-white border-slate-100 text-slate-500 hover:border-indigo-100 hover:shadow-sm'}`}
+                                            >
+                                                {isSelected && <div className="absolute top-2 right-2 text-indigo-500"><CheckCircle className="w-4 h-4" /></div>}
+                                                <span className="font-semibold pr-4">{f.name}</span>
+                                                <span className="text-xs mt-1 font-bold">+₹{f.price}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Add-ons */}
+                            <div>
+                                <label className="block text-xs font-bold text-indigo-600 mb-2 uppercase tracking-wide">Add-ons & Services</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                    {ADDONS.map(a => {
+                                        const isSelected = (client.add_ons || []).includes(a.id);
+                                        return (
+                                            <div key={a.id}
+                                                onClick={() => handleArrayToggle('add_ons', a.id)}
+                                                className={`flex flex-col justify-center p-3 rounded-xl text-sm cursor-pointer border-2 transition-all relative ${isSelected ? 'bg-amber-50 border-amber-400 text-amber-800 shadow-sm' : 'bg-white border-slate-100 text-slate-500 hover:border-amber-100 hover:shadow-sm'}`}
+                                            >
+                                                {isSelected && <div className="absolute top-2 right-2 text-amber-500"><CheckCircle className="w-4 h-4" /></div>}
+                                                <span className="font-semibold pr-4">{a.name}</span>
+                                                <span className="text-xs mt-1 font-bold">+₹{a.price}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Notes */}
                         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
                                 <FileText className="w-5 h-5 text-indigo-500" /> Client Notes
                             </h3>
                             <textarea
@@ -587,15 +587,15 @@ export default function ClientPage() {
                     <div className="lg:col-span-4 space-y-6">
 
                         {/* Financials & Payment */}
-                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm sticky top-6">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
                                 <DollarSign className="w-5 h-5 text-emerald-500" /> Financial Summary
                             </h3>
 
                             <div className="space-y-5">
                                 {/* Package Selection */}
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Selected Package</label>
+                                    <label className="block text-xs font-bold text-indigo-600 mb-1.5 uppercase">Selected Package</label>
                                     <div className="relative">
                                         <Package className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                                         <select
@@ -629,7 +629,7 @@ export default function ClientPage() {
                                 {/* Payment Actions */}
                                 <div className="space-y-3 pt-2 border-t border-slate-100">
                                     <div className="flex justify-between items-center mb-2">
-                                        <label className="text-xs font-bold text-slate-500 uppercase">Status</label>
+                                        <label className="text-xs font-bold text-indigo-600 uppercase">Status</label>
                                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${client.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-600' :
                                             client.payment_status === 'partial' ? 'bg-amber-100 text-amber-600' :
                                                 'bg-slate-200 text-slate-500'
@@ -645,21 +645,13 @@ export default function ClientPage() {
                                         <CreditCard className="w-4 h-4" />
                                         Manage Payments
                                     </button>
-
-                                    <button
-                                        onClick={handleSendReminder}
-                                        className="w-full py-3 bg-white border border-green-500 text-green-600 rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-green-50 transition-colors"
-                                    >
-                                        <MessageCircle className="w-4 h-4" />
-                                        WhatsApp Reminder
-                                    </button>
                                 </div>
                             </div>
                         </div>
 
                         {/* Custom Line Items */}
                         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
                                 <Plus className="w-4 h-4 text-indigo-500" /> Custom Line Items
                             </h3>
                             <div className="space-y-3 mb-4">
