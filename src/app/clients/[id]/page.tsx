@@ -4,7 +4,7 @@ import { useLeadFlow } from '@/context/LeadFlowContext';
 import { Client, LeadStatus } from '@/types';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Upload, Save, CheckCircle, ExternalLink, Github, Database, Globe, Briefcase, DollarSign, Layout, Server, Shield, Layers, Plus, Trash2, Check, XCircle, ArrowLeft, CreditCard, Send, Loader2, Bell, FileText, Smartphone, MessageCircle, MapPin, Search, Calendar, Monitor, LifeBuoy, Link as LinkIcon, User } from 'lucide-react';
+import { Upload, Save, CheckCircle, ExternalLink, Github, Database, Globe, Briefcase, DollarSign, Layout, Server, Shield, Layers, Plus, Trash2, Check, XCircle, ArrowLeft, CreditCard, Send, Loader2, Bell, FileText, Smartphone, MessageCircle, MapPin, Search, Calendar, Monitor, LifeBuoy, Link as LinkIcon, User, Package, Settings, Cpu } from 'lucide-react';
 import { USER_LABELS } from '@/constants';
 
 const PACKAGES = [
@@ -186,7 +186,7 @@ export default function ClientPage() {
             setAutoSaving(true);
             try {
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { id, created_at, ...updates } = client;
+                const { id, created_at, github_url, notes, admin_url, figma_url, ...updates } = client;
                 await updateClient(client.id, updates);
             } finally {
                 setAutoSaving(false);
@@ -361,7 +361,7 @@ export default function ClientPage() {
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-slate-800 flex flex-wrap items-center gap-2">
+                        <h1 className="text-xl font-bold text-slate-900 flex flex-wrap items-center gap-2">
                             {client.business_name}
                             <span className={`text-[10px] px-2 py-0.5 rounded-full text-white uppercase tracking-wider ${STATUSES.find(s => s.id === client.status)?.color || 'bg-gray-400'}`}>
                                 {STATUSES.find(s => s.id === client.status)?.label}
@@ -412,135 +412,122 @@ export default function ClientPage() {
                 </div>
             </div>
 
-            {/* Content Grid */}
+            {/* Content Grid (Refactored to 2 Columns) */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-6">
-                <div className="grid grid-cols-12 gap-4 md:gap-6 max-w-7xl mx-auto">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-7xl mx-auto">
 
-                    {/* Left Column */}
-                    <div className="col-span-12 lg:col-span-4 space-y-6">
-                        {/* Financials & Payment (Merged Card) */}
-                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                                <DollarSign className="w-5 h-5 text-emerald-500" /> Financials & Payment
+                    {/* === MAIN CONTENT (Left - 8 cols) === */}
+                    <div className="lg:col-span-8 space-y-6">
+
+                         {/* Technical Setup (Moved to Top) */}
+                         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                                <Cpu className="w-5 h-5 text-indigo-500" /> Technical Setup
                             </h3>
 
-                            <div className="space-y-5">
-                                {/* Package Selection */}
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Selected Package</label>
-                                    <select
-                                        value={client.selected_package}
-                                        onChange={(e) => handleChange('selected_package', e.target.value)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm text-slate-700 outline-none focus:border-indigo-500 transition-colors"
-                                    >
-                                        {PACKAGES.map(p => <option key={p.id} value={p.id}>{p.name} - ₹{p.price}</option>)}
-                                    </select>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                                {/* Technical Links (Now Left) */}
+                                <div className="space-y-3">
+                                    <label className="block text-xs font-bold text-indigo-600 uppercase tracking-wide">Repository & Deployment</label>
+
+                                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-400 transition-colors">
+                                        <Globe className="w-4 h-4 text-indigo-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Live Website URL"
+                                            className="bg-transparent text-sm w-full outline-none text-slate-700 placeholder:text-slate-400"
+                                            value={client.live_url || ''}
+                                            onChange={(e) => handleChange('live_url', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-400 transition-colors">
+                                        <Github className="w-4 h-4 text-slate-500" />
+                                        <input
+                                            type="text"
+                                            placeholder="GitHub Repository"
+                                            className="bg-transparent text-sm w-full outline-none text-slate-700 placeholder:text-slate-400"
+                                            value={client.github_repo || ''}
+                                            onChange={(e) => handleChange('github_repo', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-400 transition-colors">
+                                        <Layout className="w-4 h-4 text-pink-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Figma Design URL"
+                                            className="bg-transparent text-sm w-full outline-none text-slate-700 placeholder:text-slate-400"
+                                            value={client.design_link || ''}
+                                            onChange={(e) => handleChange('design_link', e.target.value)}
+                                        />
+                                    </div>
                                 </div>
 
-                                {/* Financial Summary */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                        <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider mb-1">Total Deal</p>
-                                        <p className="text-lg font-bold text-slate-800">₹{client.total_deal_value || 0}</p>
-                                    </div>
-                                    <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
-                                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-1">Paid</p>
-                                        <p className="text-lg font-bold text-emerald-600">₹{client.amount_paid || 0}</p>
-                                    </div>
-                                </div>
+                                {/* Domains (Now Right) */}
+                                <div className="space-y-4">
+                                    <label className="block text-xs font-bold text-indigo-600 uppercase tracking-wide">Domains Needed</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {DOMAINS_LIST.map(d => {
+                                            const has = (client.domains || []).some(x => x === d.id);
+                                            let isFree = false;
 
-                                {/* Outstanding */}
-                                <div className="flex justify-between items-center p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                                    <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">Outstanding</span>
-                                    <span className="text-xl font-bold text-indigo-700">₹{currentOutstanding}</span>
-                                </div>
+                                            if (client.selected_package === 'business' && d.id === 'in') {
+                                                isFree = true;
+                                            } else if (client.selected_package === 'premium' && has) {
+                                                const selectedDomains = (client.domains || [])
+                                                    .map(id => DOMAINS_LIST.find(x => x.id === id))
+                                                    .filter(x => x !== undefined) as typeof DOMAINS_LIST;
 
-                                {/* Financial Overview */}
-                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-3">
-                                    <div className="flex justify-between items-center">
-                                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Payment Status</label>
-                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${client.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-600' :
-                                            client.payment_status === 'partial' ? 'bg-amber-100 text-amber-600' :
-                                                'bg-slate-200 text-slate-500'
-                                            }`}>
-                                            {client.payment_status === 'paid' ? 'Paid' : client.payment_status === 'partial' ? 'Partial' : 'Unpaid'}
-                                        </span>
-                                    </div>
+                                                if (selectedDomains.length > 0) {
+                                                    const maxPrice = Math.max(...selectedDomains.map(x => x.price));
+                                                    const freeDomain = selectedDomains.find(x => x.price === maxPrice);
+                                                    if (freeDomain?.id === d.id) {
+                                                        isFree = true;
+                                                    }
+                                                }
+                                            }
 
-                                    <div className="space-y-3 pt-2">
-                                        <div className="pt-2">
-                                            <button
-                                                onClick={() => router.push(`/clients/${client.id}/payments`)}
-                                                className="w-full py-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-center gap-2 text-indigo-700 font-bold hover:bg-indigo-100 transition-colors"
-                                            >
-                                                <div className="p-1 bg-white rounded-full text-indigo-500">
-                                                    <CreditCard className="w-4 h-4" />
+                                            return (
+                                                <div key={d.id}
+                                                    onClick={() => {
+                                                        if (has) {
+                                                            handleChange('domains', (client.domains || []).filter(x => x !== d.id));
+                                                        } else {
+                                                            handleChange('domains', [...(client.domains || []), d.id]);
+                                                        }
+                                                    }}
+                                                    className={`flex flex-col items-center justify-center p-3 rounded-xl text-center cursor-pointer border-2 transition-all ${has ? 'bg-sky-50 border-sky-400 text-sky-800' : 'bg-white border-slate-100 text-slate-400 hover:border-sky-100'}`}
+                                                >
+                                                    <span className="font-bold">{d.name}</span>
+                                                    <span className="text-[10px] font-bold uppercase mt-1">{isFree ? 'Free (Included)' : `+₹${d.price}`}</span>
                                                 </div>
-                                                Manage Payments & History
-                                            </button>
-                                        </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="pt-2">
+                                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase">Specific Domain Preferences</label>
+                                        <textarea
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 outline-none focus:border-indigo-500 transition-colors"
+                                            placeholder="Enter preferred domain names (e.g. mybusiness.com)..."
+                                            rows={2}
+                                            value={client.domain_notes || ''}
+                                            onChange={(e) => handleChange('domain_notes', e.target.value)}
+                                        />
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Custom Line Items (Moved from Middle) */}
+                        {/* Scope & Features Configuration */}
                         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                                <Plus className="w-4 h-4 text-indigo-500" /> Custom Line Items
-                            </h3>
-                            <div className="space-y-3 mb-4">
-                                {(client.custom_items || []).map((item, idx) => (
-                                    <div key={idx} className="flex justify-between items-center text-sm p-2 bg-slate-50 rounded-lg group border border-slate-100">
-                                        <span className="text-slate-700 font-medium">{item.name}</span>
-                                        <div className="flex items-center gap-3">
-                                            <span className="font-bold text-slate-800">₹{item.price}</span>
-                                            <button onClick={() => removeCustomItem(idx)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
-                                                <XCircle className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                                {(!client.custom_items || client.custom_items.length === 0) && (
-                                    <p className="text-xs text-slate-400 italic text-center py-2">No custom items added.</p>
-                                )}
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <input
-                                    type="text"
-                                    placeholder="Item Name"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-none"
-                                    value={newItemName}
-                                    onChange={(e) => setNewItemName(e.target.value)}
-                                />
-                                <div className="flex gap-2">
-                                    <input
-                                        type="number"
-                                        placeholder="Price"
-                                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-none"
-                                        value={newItemPrice}
-                                        onChange={(e) => setNewItemPrice(e.target.value)}
-                                    />
-                                    <button onClick={addCustomItem} disabled={!newItemName} className="bg-indigo-600 text-white rounded-lg p-2 hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center w-10">
-                                        <Plus className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Middle Column */}
-                    <div className="col-span-12 lg:col-span-4 space-y-6">
-                        {/* Scope & Specs */}
-                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                                <Layers className="w-5 h-5 text-indigo-500" /> Scope & Features
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                                <Layers className="w-5 h-5 text-indigo-500" /> Project Scope & Features
                             </h3>
 
                             {/* Core Upgrades */}
                             <div className="mb-6">
-                                <label className="block text-xs font-bold text-slate-700 mb-2">Core Upgrades</label>
-                                <div className="space-y-2">
+                                <label className="block text-xs font-bold text-indigo-600 mb-2 uppercase tracking-wide">Core Upgrades</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                     {FEATURES.map(f => {
                                         const isIncluded = (PLAN_INCLUDES[client.selected_package] || []).includes(f.id);
                                         const isSelected = (client.core_upgrades || []).includes(f.id);
@@ -550,10 +537,11 @@ export default function ClientPage() {
                                         return (
                                             <div key={f.id}
                                                 onClick={() => handleArrayToggle('core_upgrades', f.id)}
-                                                className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer border transition-all ${isSelected ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
+                                                className={`flex flex-col justify-center p-3 rounded-xl text-sm cursor-pointer border-2 transition-all relative ${isSelected ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-sm' : 'bg-white border-slate-100 text-slate-500 hover:border-indigo-100 hover:shadow-sm'}`}
                                             >
-                                                <span>{f.name}</span>
-                                                <span className="text-xs font-bold">+₹{f.price}</span>
+                                                {isSelected && <div className="absolute top-2 right-2 text-indigo-500"><CheckCircle className="w-4 h-4" /></div>}
+                                                <span className="font-semibold pr-4">{f.name}</span>
+                                                <span className="text-xs mt-1 font-bold">+₹{f.price}</span>
                                             </div>
                                         );
                                     })}
@@ -561,145 +549,151 @@ export default function ClientPage() {
                             </div>
 
                             {/* Add-ons */}
-                            <div className="mb-6">
-                                <label className="block text-xs font-bold text-slate-700 mb-2">Add-ons & Services</label>
-                                <div className="space-y-2">
-                                    {ADDONS.map(a => (
-                                        <div key={a.id}
-                                            onClick={() => handleArrayToggle('add_ons', a.id)}
-                                            className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer border transition-all ${(client.add_ons || []).includes(a.id) ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
-                                        >
-                                            <span>{a.name}</span>
-                                            <span className="text-xs font-bold">+₹{a.price}</span>
-                                        </div>
-                                    ))}
+                            <div>
+                                <label className="block text-xs font-bold text-indigo-600 mb-2 uppercase tracking-wide">Add-ons & Services</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                    {ADDONS.map(a => {
+                                        const isSelected = (client.add_ons || []).includes(a.id);
+                                        return (
+                                            <div key={a.id}
+                                                onClick={() => handleArrayToggle('add_ons', a.id)}
+                                                className={`flex flex-col justify-center p-3 rounded-xl text-sm cursor-pointer border-2 transition-all relative ${isSelected ? 'bg-amber-50 border-amber-400 text-amber-800 shadow-sm' : 'bg-white border-slate-100 text-slate-500 hover:border-amber-100 hover:shadow-sm'}`}
+                                            >
+                                                {isSelected && <div className="absolute top-2 right-2 text-amber-500"><CheckCircle className="w-4 h-4" /></div>}
+                                                <span className="font-semibold pr-4">{a.name}</span>
+                                                <span className="text-xs mt-1 font-bold">+₹{a.price}</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Column */}
-                    <div className="col-span-12 lg:col-span-4 space-y-6">
-
-                        {/* Technical Links (Moved from Left) */}
-                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                                <ExternalLink className="w-5 h-5 text-indigo-500" /> Technical Links
-                            </h3>
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                    <Globe className="w-4 h-4 text-indigo-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="Live Website URL"
-                                        className="bg-transparent text-sm w-full outline-none text-slate-600 placeholder:text-slate-300"
-                                        value={client.live_url || ''}
-                                        onChange={(e) => handleChange('live_url', e.target.value)}
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                    <Github className="w-4 h-4 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="GitHub Repository"
-                                        className="bg-transparent text-sm w-full outline-none text-slate-600 placeholder:text-slate-300"
-                                        value={client.github_repo || ''}
-                                        onChange={(e) => handleChange('github_repo', e.target.value)}
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                    <Layout className="w-4 h-4 text-pink-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="Figma Design URL"
-                                        className="bg-transparent text-sm w-full outline-none text-slate-600 placeholder:text-slate-300"
-                                        value={client.design_link || ''}
-                                        onChange={(e) => handleChange('design_link', e.target.value)}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* NEW: QUICK REMINDER SECTION */}
-                            <div className="mt-4 pt-4 border-t border-slate-100">
-                                <h4 className="text-xs font-bold text-slate-700 uppercase mb-2">Quick Actions</h4>
-                                <button
-                                    onClick={handleSendReminder}
-                                    className="w-full py-2 bg-green-500 text-white rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-green-600 shadow-sm shadow-green-200 transition-all"
-                                >
-                                    <MessageCircle className="w-4 h-4" /> Send Payment Reminder
-                                </button>
-                                <p className="text-[10px] text-slate-400 mt-2 text-center">
-                                    Sends WhatsApp message with detailed cost breakdown & payment links.
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Domains */}
-                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                                <Globe className="w-5 h-5 text-indigo-500" /> Domains Needed
-                            </h3>
-                            <div className="space-y-2">
-                                {DOMAINS_LIST.map(d => {
-                                    const has = (client.domains || []).some(x => x === d.id);
-                                    let isFree = false;
-
-                                    if (client.selected_package === 'business' && d.id === 'in') {
-                                        isFree = true;
-                                    } else if (client.selected_package === 'premium' && has) {
-                                        const selectedDomains = (client.domains || [])
-                                            .map(id => DOMAINS_LIST.find(x => x.id === id))
-                                            .filter(x => x !== undefined) as typeof DOMAINS_LIST;
-
-                                        if (selectedDomains.length > 0) {
-                                            const maxPrice = Math.max(...selectedDomains.map(x => x.price));
-                                            const freeDomain = selectedDomains.find(x => x.price === maxPrice);
-                                            if (freeDomain?.id === d.id) {
-                                                isFree = true;
-                                            }
-                                        }
-                                    }
-
-                                    return (
-                                        <div key={d.id}
-                                            onClick={() => {
-                                                if (has) {
-                                                    handleChange('domains', (client.domains || []).filter(x => x !== d.id));
-                                                } else {
-                                                    handleChange('domains', [...(client.domains || []), d.id]);
-                                                }
-                                            }}
-                                            className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer border transition-all ${has ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
-                                        >
-                                            <span>{d.name}</span>
-                                            <span className="text-xs font-bold">{isFree ? 'Free' : `+₹${d.price}`}</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-slate-100">
-                                <label className="block text-xs font-bold text-slate-700 mb-2">Specific Domain Names</label>
-                                <textarea
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 outline-none focus:border-indigo-500"
-                                    placeholder="Enter preferred domain names here (e.g. mybusiness.com)..."
-                                    rows={3}
-                                    value={client.domain_notes || ''}
-                                    onChange={(e) => handleChange('domain_notes', e.target.value)}
-                                />
                             </div>
                         </div>
 
                         {/* Notes */}
                         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
                                 <FileText className="w-5 h-5 text-indigo-500" /> Client Notes
                             </h3>
                             <textarea
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 outline-none focus:border-indigo-500 h-[200px]"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-700 outline-none focus:border-indigo-500 transition-colors h-[150px]"
                                 placeholder="Add any specific requirements, meeting notes, or details about the client here..."
                                 value={client.internal_notes || ''}
                                 onChange={(e) => handleChange('internal_notes', e.target.value)}
                             />
+                        </div>
+
+                    </div>
+
+                    {/* === SIDEBAR (Right - 4 cols) === */}
+                    <div className="lg:col-span-4 space-y-6">
+
+                        {/* Financials & Payment */}
+                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                                <DollarSign className="w-5 h-5 text-emerald-500" /> Financial Summary
+                            </h3>
+
+                            <div className="space-y-5">
+                                {/* Package Selection */}
+                                <div>
+                                    <label className="block text-xs font-bold text-indigo-600 mb-1.5 uppercase">Selected Package</label>
+                                    <div className="relative">
+                                        <Package className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                                        <select
+                                            value={client.selected_package}
+                                            onChange={(e) => handleChange('selected_package', e.target.value)}
+                                            className="w-full pl-9 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 transition-colors appearance-none"
+                                        >
+                                            {PACKAGES.map(p => <option key={p.id} value={p.id}>{p.name} - ₹{p.price}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Financial Stats Grid */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Total Value</p>
+                                        <p className="text-lg font-bold text-slate-800">₹{client.total_deal_value || 0}</p>
+                                    </div>
+                                    <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+                                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-1">Amount Paid</p>
+                                        <p className="text-lg font-bold text-emerald-600">₹{client.amount_paid || 0}</p>
+                                    </div>
+                                </div>
+
+                                {/* Outstanding Bar */}
+                                <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100 flex flex-col items-center justify-center">
+                                    <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">Outstanding Due</span>
+                                    <span className="text-3xl font-bold text-indigo-600">₹{currentOutstanding}</span>
+                                </div>
+
+                                {/* Payment Actions */}
+                                <div className="space-y-3 pt-2 border-t border-slate-100">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="text-xs font-bold text-indigo-600 uppercase">Status</label>
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${client.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-600' :
+                                            client.payment_status === 'partial' ? 'bg-amber-100 text-amber-600' :
+                                                'bg-slate-200 text-slate-500'
+                                            }`}>
+                                            {client.payment_status === 'paid' ? 'Paid' : client.payment_status === 'partial' ? 'Partial' : 'Unpaid'}
+                                        </span>
+                                    </div>
+
+                                    <button
+                                        onClick={() => router.push(`/clients/${client.id}/payments`)}
+                                        className="w-full py-3 bg-indigo-600 text-white rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
+                                    >
+                                        <CreditCard className="w-4 h-4" />
+                                        Manage Payments
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Custom Line Items */}
+                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                                <Plus className="w-4 h-4 text-indigo-500" /> Custom Line Items
+                            </h3>
+                            <div className="space-y-3 mb-4">
+                                {(client.custom_items || []).map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-sm p-3 bg-slate-50 rounded-lg group border border-slate-100 hover:border-slate-300 transition-all">
+                                        <span className="text-slate-700 font-medium">{item.name}</span>
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-bold text-slate-800">₹{item.price}</span>
+                                            <button onClick={() => removeCustomItem(idx)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1 hover:bg-rose-50 rounded">
+                                                <XCircle className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {(!client.custom_items || client.custom_items.length === 0) && (
+                                    <div className="text-center py-4 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                                        <p className="text-xs text-slate-400 italic">No custom items added.</p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Item Name"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-400 transition-colors"
+                                    value={newItemName}
+                                    onChange={(e) => setNewItemName(e.target.value)}
+                                />
+                                <div className="flex gap-2">
+                                    <input
+                                        type="number"
+                                        placeholder="Price"
+                                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-400 transition-colors"
+                                        value={newItemPrice}
+                                        onChange={(e) => setNewItemPrice(e.target.value)}
+                                    />
+                                    <button onClick={addCustomItem} disabled={!newItemName} className="bg-indigo-600 text-white rounded-lg px-4 hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center">
+                                        <Plus className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                     </div>
