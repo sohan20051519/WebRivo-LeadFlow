@@ -2,7 +2,6 @@
 
 import { useLeadFlow } from '@/context/LeadFlowContext';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
     Upload,
     X,
@@ -32,6 +31,7 @@ export default function DatasetsPage() {
         processUploadQueue,
         deleteDataset,
         renameDataset,
+        updateDatasetAssignee,
         searchTerm,
         setSearchTerm,
         currentUser
@@ -40,6 +40,7 @@ export default function DatasetsPage() {
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [assigningId, setAssigningId] = useState<string | null>(null);
     const [tempName, setTempName] = useState('');
     const [isDragging, setIsDragging] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -205,7 +206,11 @@ export default function DatasetsPage() {
                                 const completion = total > 0 ? Math.round((processed / total) * 100) : 0;
 
                                 return (
-                                    <Link key={ds.id} href={`/dataset/${ds.id}`} className="group block bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all overflow-hidden relative">
+                                    <div
+                                        key={ds.id}
+                                        onClick={() => router.push(`/dataset/${ds.id}`)}
+                                        className="group block bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all overflow-hidden relative cursor-pointer"
+                                    >
                                         {/* Progress Bar Top */}
                                         <div className="absolute top-0 left-0 right-0 h-1 bg-slate-100">
                                             <div className="h-full bg-indigo-500 transition-all" style={{ width: `${completion}%` }} />
@@ -216,7 +221,7 @@ export default function DatasetsPage() {
                                                 <div className="bg-indigo-50 p-2 rounded-lg">
                                                     <FileText className="w-6 h-6 text-indigo-500" />
                                                 </div>
-                                                <div className="flex gap-1" onClick={(e) => e.preventDefault()}>
+                                                <div className="flex gap-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                                                     <button
                                                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingId(ds.id); setTempName(ds.name); }}
                                                         className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Rename"
@@ -233,7 +238,7 @@ export default function DatasetsPage() {
                                             </div>
 
                                             {editingId === ds.id ? (
-                                                <div className="mb-2" onClick={(e) => e.preventDefault()}>
+                                                <div className="mb-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                                                     <input
                                                         autoFocus
                                                         value={tempName}
@@ -245,12 +250,42 @@ export default function DatasetsPage() {
                                                     />
                                                 </div>
                                             ) : (
-                                                <h3 className="font-bold text-slate-800 text-lg mb-1 truncate group-hover:text-indigo-600 transition-colors">
-                                                    {ds.name}
-                                                    {currentUser === 'admin' && (ds.assignedUser || ds.assignedTo) && (
-                                                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-700 font-bold uppercase tracking-wider align-middle">
-                                                            {USER_LABELS[ds.assignedUser || ds.assignedTo || ''] || ds.assignedUser || ds.assignedTo}
-                                                        </span>
+                                                <h3 className="font-bold text-slate-800 text-lg mb-1 truncate group-hover:text-indigo-600 transition-colors flex items-center">
+                                                    <span className="truncate">{ds.name}</span>
+                                                    {currentUser === 'admin' && (
+                                                        assigningId === ds.id ? (
+                                                            <div className="ml-2 inline-flex items-center gap-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                                                                <select
+                                                                    value={ds.assignedUser || ds.assignedTo || ''}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.value) {
+                                                                            updateDatasetAssignee(ds.id, e.target.value);
+                                                                            setAssigningId(null);
+                                                                        }
+                                                                    }}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className="text-[10px] uppercase font-bold border border-indigo-200 rounded px-1 py-0.5 text-indigo-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                                >
+                                                                    <option value="" disabled>Select User</option>
+                                                                    {Object.entries(USER_LABELS).map(([key, label]) => (
+                                                                        <option key={key} value={key}>{label}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <button onClick={(e) => { e.stopPropagation(); setAssigningId(null); }} className="text-slate-400 hover:text-rose-500"><X className="w-3 h-3" /></button>
+                                                            </div>
+                                                        ) : (
+                                                            <span
+                                                                className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-700 font-bold uppercase tracking-wider align-middle cursor-pointer hover:bg-indigo-200 transition-colors whitespace-nowrap"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    setAssigningId(ds.id);
+                                                                }}
+                                                                title="Click to reassign"
+                                                            >
+                                                                {USER_LABELS[ds.assignedUser || ds.assignedTo || ''] || ds.assignedUser || ds.assignedTo || 'ASSIGN'}
+                                                            </span>
+                                                        )
                                                     )}
                                                 </h3>
                                             )}
@@ -274,7 +309,7 @@ export default function DatasetsPage() {
                                                 </div>
                                             </div>
                                         </div>
-                                    </Link>
+                                    </div>
                                 );
                             })}
                         </div>
