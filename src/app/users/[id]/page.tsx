@@ -3,6 +3,7 @@
 import { useLeadFlow } from '@/context/LeadFlowContext';
 import { useRouter, useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { LeadStatus } from '@/types';
 import {
     User, ArrowLeft, TrendingUp, IndianRupee, CheckCircle,
     XCircle, Clock, AlertCircle, Loader2
@@ -60,15 +61,29 @@ export default function UserDetailsPage() {
 
             // 2. Filter clients belonging to these datasets OR explicitly assigned to user
             const relevantClients = clients.filter(c => {
-                // Direct assignment
+                // First, check assignment
+                let isAssigned = false;
                 if (c.assigned_user && c.assigned_user.toLowerCase() === username.toLowerCase()) {
-                    return true;
+                    isAssigned = true;
+                } else if (c.source_dataset_id && assignedDatasetIds.has(c.source_dataset_id)) {
+                    isAssigned = true;
                 }
-                // Inherited from dataset
-                if (c.source_dataset_id && assignedDatasetIds.has(c.source_dataset_id)) {
-                    return true;
+
+                if (!isAssigned) return false;
+
+                // Second, if linked to a dataset, ensure the lead is actually ACCEPTED
+                if (c.source_dataset_id && c.source_row_index !== undefined && c.source_row_index !== null) {
+                    const ds = datasets.find(d => d.id === c.source_dataset_id);
+                    if (ds) {
+                        const status = ds.statuses[c.source_row_index];
+                        // Strictly filter for ACCEPTED status
+                        if (status !== LeadStatus.ACCEPTED) {
+                            return false;
+                        }
+                    }
                 }
-                return false;
+
+                return true;
             });
 
             // 3. Fetch Commission Records
