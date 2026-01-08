@@ -8,6 +8,7 @@ import {
     XCircle, Clock, AlertCircle, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
+import { LeadStatus } from '@/types';
 
 // Commission Rules
 const COMMISSION_RATES: any = {
@@ -48,19 +49,25 @@ export default function UserDetailsPage() {
             setLoading(true);
 
             // 1. Identify datasets assigned to this user
-            // Assigned via prefix "[username]"
-            // Or explicitly assigned via naming convention we used: "[username] Name"
+            // Assigned via prefix "[username]" or explicit DB assignment
             const assignedDatasets = datasets.filter(ds => {
-                const nameLower = ds.name.toLowerCase();
-                return nameLower.startsWith(`[${username.toLowerCase()}]`);
+                return ds.assignedUser?.toLowerCase() === username.toLowerCase();
             });
 
             const assignedDatasetIds = new Set(assignedDatasets.map(ds => ds.id));
 
-            // 2. Filter clients belonging to these datasets
-            const relevantClients = clients.filter(c =>
-                c.source_dataset_id && assignedDatasetIds.has(c.source_dataset_id)
-            );
+            // 2. Filter clients belonging to these datasets AND are accepted leads
+            const relevantClients = clients.filter(c => {
+                // Must have source dataset
+                if (!c.source_dataset_id || !assignedDatasetIds.has(c.source_dataset_id)) return false;
+
+                // Check source lead status
+                const ds = datasets.find(d => d.id === c.source_dataset_id);
+                if (!ds || c.source_row_index === undefined) return false;
+
+                const status = ds.statuses[c.source_row_index];
+                return status === LeadStatus.ACCEPTED;
+            });
 
             // 3. Fetch Commission Records
             const commDataset = datasets.find(d => d.name === '__system_commissions__');
