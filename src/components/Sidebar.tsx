@@ -16,7 +16,8 @@ import {
     FileText,
     RefreshCw,
     ShieldCheck,
-    Users
+    Users,
+    Briefcase
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -31,6 +32,7 @@ export default function Sidebar() {
     const navItems = [
         { label: 'Dashboard', icon: LayoutDashboard, color: 'text-indigo-500', href: '/dash' },
         { label: 'Datasets', icon: Database, color: 'text-blue-500', href: '/datasets' },
+        { label: 'Clients', icon: Briefcase, color: 'text-indigo-600', href: '/clients' },
         { label: 'Pricing Calculator', icon: Calculator, color: 'text-purple-500', href: '/calc' },
         { label: 'Accepted', icon: CheckCircle, color: 'text-emerald-500', href: '/accepted' },
         { label: 'Waitlist', icon: PauseCircle, color: 'text-amber-500', href: '/waitlist' },
