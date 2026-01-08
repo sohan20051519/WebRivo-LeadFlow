@@ -33,6 +33,7 @@ interface LeadFlowContextType {
     // Operations
     deleteDataset: (id: string) => Promise<boolean>;
     renameDataset: (id: string, newName: string) => Promise<void>;
+    updateDatasetAssignee: (datasetId: string, assignee: string) => Promise<void>;
     updateLeadStatus: (datasetId: string, rowIndex: number, status: LeadStatus) => Promise<void>;
     updateCell: (datasetId: string, rowIndex: number, column: string, value: string) => Promise<void>;
 
@@ -327,6 +328,27 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const updateDatasetAssignee = async (datasetId: string, assignee: string) => {
+        try {
+            const { error } = await supabase.from('datasets').update({ assigned_user: assignee }).eq('id', datasetId);
+            if (error) throw new Error(error.message);
+
+            setDatasets(prev => prev.map(d => {
+                if (d.id === datasetId) {
+                    // We update both assignedUser (DB source) and potentially assignedTo (logic source)
+                    // to ensure UI updates immediately and access rights are propagated
+                    return { ...d, assignedUser: assignee, assignedTo: assignee };
+                }
+                return d;
+            }));
+
+            showFeedback("Dataset assignee updated", 'success');
+        } catch (e: any) {
+            console.error("Assign update failed", e.message || e);
+            showFeedback(`Assign update failed: ${e.message}`, 'error');
+        }
+    };
+
     const updateLeadStatus = async (datasetId: string, rowIndex: number, status: LeadStatus) => {
         const ds = datasets.find(d => d.id === datasetId);
         if (!ds) return;
@@ -528,6 +550,7 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
                 processUploadQueue,
                 deleteDataset,
                 renameDataset,
+                updateDatasetAssignee,
                 updateLeadStatus,
                 updateCell,
                 getClient,
