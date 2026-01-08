@@ -429,7 +429,7 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
             showFeedback("Client updated", 'success');
         } catch (e: any) {
             console.error("Update client failed", e.message);
-            showFeedback("Failed to update client", 'error');
+            showFeedback(`Failed to update client: ${e.message}`, 'error');
         }
     }
 

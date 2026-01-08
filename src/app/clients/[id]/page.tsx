@@ -186,7 +186,7 @@ export default function ClientPage() {
             setAutoSaving(true);
             try {
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { id, created_at, ...updates } = client;
+                const { id, created_at, github_url, notes, admin_url, figma_url, ...updates } = client;
                 await updateClient(client.id, updates);
             } finally {
                 setAutoSaving(false);
@@ -426,7 +426,44 @@ export default function ClientPage() {
                             </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Domains */}
+
+                                {/* Technical Links (Now Left) */}
+                                <div className="space-y-3">
+                                    <label className="block text-xs font-bold text-indigo-600 uppercase tracking-wide">Repository & Deployment</label>
+
+                                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-400 transition-colors">
+                                        <Globe className="w-4 h-4 text-indigo-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Live Website URL"
+                                            className="bg-transparent text-sm w-full outline-none text-slate-700 placeholder:text-slate-400"
+                                            value={client.live_url || ''}
+                                            onChange={(e) => handleChange('live_url', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-400 transition-colors">
+                                        <Github className="w-4 h-4 text-slate-500" />
+                                        <input
+                                            type="text"
+                                            placeholder="GitHub Repository"
+                                            className="bg-transparent text-sm w-full outline-none text-slate-700 placeholder:text-slate-400"
+                                            value={client.github_repo || ''}
+                                            onChange={(e) => handleChange('github_repo', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-400 transition-colors">
+                                        <Layout className="w-4 h-4 text-pink-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Figma Design URL"
+                                            className="bg-transparent text-sm w-full outline-none text-slate-700 placeholder:text-slate-400"
+                                            value={client.design_link || ''}
+                                            onChange={(e) => handleChange('design_link', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Domains (Now Right) */}
                                 <div className="space-y-4">
                                     <label className="block text-xs font-bold text-indigo-600 uppercase tracking-wide">Domains Needed</label>
                                     <div className="grid grid-cols-2 gap-2">
@@ -475,42 +512,6 @@ export default function ClientPage() {
                                             rows={2}
                                             value={client.domain_notes || ''}
                                             onChange={(e) => handleChange('domain_notes', e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Technical Links */}
-                                <div className="space-y-3">
-                                    <label className="block text-xs font-bold text-indigo-600 uppercase tracking-wide">Repository & Deployment</label>
-
-                                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-400 transition-colors">
-                                        <Globe className="w-4 h-4 text-indigo-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="Live Website URL"
-                                            className="bg-transparent text-sm w-full outline-none text-slate-700 placeholder:text-slate-400"
-                                            value={client.live_url || ''}
-                                            onChange={(e) => handleChange('live_url', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-400 transition-colors">
-                                        <Github className="w-4 h-4 text-slate-500" />
-                                        <input
-                                            type="text"
-                                            placeholder="GitHub Repository"
-                                            className="bg-transparent text-sm w-full outline-none text-slate-700 placeholder:text-slate-400"
-                                            value={client.github_repo || ''}
-                                            onChange={(e) => handleChange('github_repo', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-400 transition-colors">
-                                        <Layout className="w-4 h-4 text-pink-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="Figma Design URL"
-                                            className="bg-transparent text-sm w-full outline-none text-slate-700 placeholder:text-slate-400"
-                                            value={client.design_link || ''}
-                                            onChange={(e) => handleChange('design_link', e.target.value)}
                                         />
                                     </div>
                                 </div>
