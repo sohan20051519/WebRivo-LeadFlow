@@ -59,31 +59,24 @@ export default function UserDetailsPage() {
 
             const assignedDatasetIds = new Set(assignedDatasets.map(ds => ds.id));
 
-            // 2. Filter clients belonging to these datasets OR explicitly assigned to user
+            // 2. Filter clients: Strictly show only accepted leads from datasets assigned to this user
             const relevantClients = clients.filter(c => {
-                // First, check assignment
-                let isAssigned = false;
-                if (c.assigned_user && c.assigned_user.toLowerCase() === username.toLowerCase()) {
-                    isAssigned = true;
-                } else if (c.source_dataset_id && assignedDatasetIds.has(c.source_dataset_id)) {
-                    isAssigned = true;
+                // Must have a source dataset
+                if (!c.source_dataset_id || c.source_row_index === undefined || c.source_row_index === null) {
+                    return false;
                 }
 
-                if (!isAssigned) return false;
-
-                // Second, if linked to a dataset, ensure the lead is actually ACCEPTED
-                if (c.source_dataset_id && c.source_row_index !== undefined && c.source_row_index !== null) {
-                    const ds = datasets.find(d => d.id === c.source_dataset_id);
-                    if (ds) {
-                        const status = ds.statuses[c.source_row_index];
-                        // Strictly filter for ACCEPTED status
-                        if (status !== LeadStatus.ACCEPTED) {
-                            return false;
-                        }
-                    }
+                // Dataset must be assigned to this user
+                if (!assignedDatasetIds.has(c.source_dataset_id)) {
+                    return false;
                 }
 
-                return true;
+                // Lead status must be ACCEPTED
+                const ds = datasets.find(d => d.id === c.source_dataset_id);
+                if (!ds) return false;
+
+                const status = ds.statuses[c.source_row_index];
+                return status === LeadStatus.ACCEPTED;
             });
 
             // 3. Fetch Commission Records
