@@ -48,19 +48,28 @@ export default function UserDetailsPage() {
             setLoading(true);
 
             // 1. Identify datasets assigned to this user
-            // Assigned via prefix "[username]"
-            // Or explicitly assigned via naming convention we used: "[username] Name"
+            // Assigned via prefix "[username]" OR explicit assignedUser field
             const assignedDatasets = datasets.filter(ds => {
                 const nameLower = ds.name.toLowerCase();
-                return nameLower.startsWith(`[${username.toLowerCase()}]`);
+                const assignedUserMatches = ds.assignedUser && ds.assignedUser.toLowerCase() === username.toLowerCase();
+                const prefixMatches = nameLower.startsWith(`[${username.toLowerCase()}]`);
+                return assignedUserMatches || prefixMatches;
             });
 
             const assignedDatasetIds = new Set(assignedDatasets.map(ds => ds.id));
 
-            // 2. Filter clients belonging to these datasets
-            const relevantClients = clients.filter(c =>
-                c.source_dataset_id && assignedDatasetIds.has(c.source_dataset_id)
-            );
+            // 2. Filter clients belonging to these datasets OR explicitly assigned to user
+            const relevantClients = clients.filter(c => {
+                // Direct assignment
+                if (c.assigned_user && c.assigned_user.toLowerCase() === username.toLowerCase()) {
+                    return true;
+                }
+                // Inherited from dataset
+                if (c.source_dataset_id && assignedDatasetIds.has(c.source_dataset_id)) {
+                    return true;
+                }
+                return false;
+            });
 
             // 3. Fetch Commission Records
             const commDataset = datasets.find(d => d.name === '__system_commissions__');
