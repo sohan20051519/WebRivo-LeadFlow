@@ -86,7 +86,7 @@ export function LeadFlowProvider({ children }: { children: ReactNode }) {
         try {
             const { data, error } = await supabase
                 .from('datasets')
-                .select('*')
+                .select('*, assigned_user')
                 .order('created_at', { ascending: false });
 
             if (error) throw new Error(error.message);
