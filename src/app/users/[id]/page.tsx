@@ -56,17 +56,43 @@ export default function UserDetailsPage() {
 
             const assignedDatasetIds = new Set(assignedDatasets.map(ds => ds.id));
 
-            // 2. Filter clients belonging to these datasets AND are accepted leads
-            const relevantClients = clients.filter(c => {
-                // Must have source dataset
-                if (!c.source_dataset_id || !assignedDatasetIds.has(c.source_dataset_id)) return false;
+            // 2. Identify ALL Accepted Leads from these datasets
+            // This ensures we show leads that are accepted but not yet converted to Clients
+            let allAcceptedLeads: any[] = [];
 
-                // Check source lead status
-                const ds = datasets.find(d => d.id === c.source_dataset_id);
-                if (!ds || c.source_row_index === undefined) return false;
+            assignedDatasets.forEach(ds => {
+                Object.entries(ds.statuses).forEach(([rowIdxStr, status]) => {
+                    if (status === LeadStatus.ACCEPTED) {
+                        const rowIdx = parseInt(rowIdxStr);
+                        const rowData = ds.data[rowIdx];
 
-                const status = ds.statuses[c.source_row_index];
-                return status === LeadStatus.ACCEPTED;
+                        // Try to find existing client
+                        const existingClient = clients.find(c =>
+                            c.source_dataset_id === ds.id &&
+                            c.source_row_index === rowIdx
+                        );
+
+                        if (existingClient) {
+                            allAcceptedLeads.push({
+                                ...existingClient,
+                                type: 'client',
+                                // Original commission logic will be applied later
+                            });
+                        } else {
+                            // Create a placeholder client object
+                            allAcceptedLeads.push({
+                                id: `temp_${ds.id}_${rowIdx}`, // Temporary ID
+                                type: 'lead',
+                                business_name: rowData['Business Name'] || rowData['Company'] || rowData['Organization'] || 'Unknown Business',
+                                contact_name: rowData['Contact Person'] || rowData['Name'] || '',
+                                selected_package: 'basic', // Default for calc, but maybe show as pending
+                                status: 'lead_accepted', // Special status for UI
+                                source_dataset_id: ds.id,
+                                source_row_index: rowIdx
+                            });
+                        }
+                    }
+                });
             });
 
             // 3. Fetch Commission Records
@@ -85,17 +111,27 @@ export default function UserDetailsPage() {
             }
             setCommissionRecords(commData);
 
-            // 4. Calculate Stats
+            // 4. Calculate Stats & Merge
             let total = 0;
             let paid = 0;
             let pending = 0;
 
-            const clientsWithComm = relevantClients.map(client => {
-                const pkg = client.selected_package || 'basic'; // Default or find logic
-                // Check if package is valid
-                const amount = COMMISSION_RATES[pkg] || 0;
-                const record = commData[client.id];
-                const isPaid = record?.status === 'paid';
+            const finalClients = allAcceptedLeads.map(item => {
+                // If it's a raw lead, commission is potential (0 until setup?)
+                // Or user assumes Basic plan commission?
+                // Let's assume 0 commission until they are a Client with a selected package.
+                // UNLESS we want to show potential earnings.
+                // For now, let's treat them as actionable items but 0 commission to avoid inflating stats falsely.
+
+                let amount = 0;
+                let isPaid = false;
+
+                if (item.type === 'client') {
+                    const pkg = item.selected_package || 'basic';
+                    amount = COMMISSION_RATES[pkg] || 0;
+                    const record = commData[item.id];
+                    isPaid = record?.status === 'paid';
+                }
 
                 if (amount > 0) {
                     total += amount;
@@ -104,18 +140,18 @@ export default function UserDetailsPage() {
                 }
 
                 return {
-                    ...client,
+                    ...item,
                     commissionAmount: amount,
                     commissionStatus: isPaid ? 'paid' : 'unpaid'
                 };
             });
 
-            setUserClients(clientsWithComm);
+            setUserClients(finalClients);
             setStats({
                 totalEarned: total,
                 paid,
                 pending,
-                count: clientsWithComm.length
+                count: finalClients.length
             });
 
             setLoading(false);
@@ -309,9 +345,10 @@ export default function UserDetailsPage() {
                                                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                                                         client.status === 'live' ? 'bg-emerald-100 text-emerald-700' :
                                                         client.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                                        client.status === 'lead_accepted' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
                                                         'bg-slate-100 text-slate-600'
                                                     }`}>
-                                                        {client.status.replace('_', ' ')}
+                                                        {client.status === 'lead_accepted' ? 'Pending Setup' : client.status.replace('_', ' ')}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-right font-bold text-slate-700">
